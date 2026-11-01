@@ -2,17 +2,57 @@ import mapboxgl from 'mapbox-gl'
 import 'mapbox-gl/dist/mapbox-gl.css'
 import { useEffect, useRef, useState } from 'react'
 import {
+  averageLatitude,
   boundsOfRoutes,
   checkpointPopupHtml,
   checkpointsGeoJson,
+  corridorGeoJson,
+  HEATMAP_INTENSITY,
+  heatmapRadiusExpression,
+  heatmapWeightExpression,
   riskGradientExpression,
   routeLinesGeoJson,
 } from '../mapData'
+import { RISK_COLORS } from '../risk'
+import HeatmapControls from './HeatmapControls'
 
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN
 const CONTINENTAL_US = { center: [-98.5, 39.5], zoom: 3.4 }
 const EMPTY_COLLECTION = { type: 'FeatureCollection', features: [] }
 const SLATE = '#7C8B96'
+
+function withAlpha(hex, alpha) {
+  const value = parseInt(hex.slice(1), 16)
+  return `rgba(${value >> 16}, ${(value >> 8) & 255}, ${value & 255}, ${alpha})`
+}
+
+// Density 0-1 follows the 0-4 scale: 0.25 Moderate ... 1 No Travel. Low stays
+// clear so the base map shows through wherever conditions are fine.
+const HEATMAP_COLOR = [
+  'interpolate', ['linear'], ['heatmap-density'],
+  0, withAlpha(RISK_COLORS.moderate, 0),
+  0.25, withAlpha(RISK_COLORS.moderate, 0.45),
+  0.5, withAlpha(RISK_COLORS.high, 0.6),
+  0.75, withAlpha(RISK_COLORS.severe, 0.7),
+  1, withAlpha(RISK_COLORS.no_travel, 0.8),
+]
+
+function addCorridorHeatmap(map) {
+  map.addSource('corridor', { type: 'geojson', data: EMPTY_COLLECTION })
+  // Under the place labels so town names stay readable through the heat.
+  const firstLabelLayer = map.getStyle().layers.find((layer) => layer.type === 'symbol')?.id
+  map.addLayer({
+    id: 'corridor-heat',
+    type: 'heatmap',
+    source: 'corridor',
+    paint: {
+      'heatmap-weight': heatmapWeightExpression('risk', 0),
+      'heatmap-color': HEATMAP_COLOR,
+      'heatmap-intensity': HEATMAP_INTENSITY,
+      'heatmap-opacity': 0.85,
+    },
+  }, firstLabelLayer)
+}
 
 function addRouteLayers(map) {
   map.addSource('routes', { type: 'geojson', data: EMPTY_COLLECTION })
@@ -59,6 +99,15 @@ export default function RouteMap({ plan, selectedRouteId, onSelectRoute }) {
   const mapRef = useRef(null)
   const popupRef = useRef(null)
   const [isMapReady, setIsMapReady] = useState(false)
+  const [heatmapLayer, setHeatmapLayer] = useState('risk')
+  const [forecastHour, setForecastHour] = useState(0)
+  // A new plan starts the slider back at departure (adjusting state during render,
+  // the React-recommended way to reset state when a prop changes).
+  const [heatmapPlan, setHeatmapPlan] = useState(plan)
+  if (plan !== heatmapPlan) {
+    setHeatmapPlan(plan)
+    setForecastHour(0)
+  }
   // Map event handlers are registered once; this ref lets them see the latest props.
   const latest = useRef({ plan, selectedRouteId, onSelectRoute })
   useEffect(() => {
@@ -77,6 +126,7 @@ export default function RouteMap({ plan, selectedRouteId, onSelectRoute }) {
     popupRef.current = new mapboxgl.Popup({ closeButton: true, maxWidth: '260px' })
 
     map.on('load', () => {
+      addCorridorHeatmap(map)
       addRouteLayers(map)
       setIsMapReady(true)
     })
@@ -114,7 +164,17 @@ export default function RouteMap({ plan, selectedRouteId, onSelectRoute }) {
     const map = mapRef.current
     if (!isMapReady || !plan) return
     map.getSource('routes').setData(routeLinesGeoJson(plan.routes))
-    map.fitBounds(boundsOfRoutes(plan.routes), { padding: 56, duration: 600 })
+    const corridor = plan.corridor_forecast
+    map.getSource('corridor').setData(corridorGeoJson(corridor))
+    map.setPaintProperty('corridor-heat', 'heatmap-radius',
+      heatmapRadiusExpression(corridor.spacing_m, averageLatitude(corridor.points)))
+    // Extra bottom padding keeps routes clear of the heatmap controls card,
+    // scaled down on short (phone) maps so the routes still get most of the space.
+    const mapHeight = map.getContainer().clientHeight
+    map.fitBounds(boundsOfRoutes(plan.routes), {
+      padding: { top: 40, right: 40, left: 40, bottom: Math.min(220, Math.round(mapHeight * 0.4)) },
+      duration: 600,
+    })
   }, [isMapReady, plan])
 
   // Selection: recolor the chosen route by risk and show its checkpoints.
@@ -130,6 +190,15 @@ export default function RouteMap({ plan, selectedRouteId, onSelectRoute }) {
     map.getSource('checkpoints').setData(checkpointsGeoJson(selected))
   }, [isMapReady, plan, selectedRouteId])
 
+  // Slider or layer change: point the heatmap at another property. No data reload.
+  useEffect(() => {
+    const map = mapRef.current
+    if (!isMapReady) return
+    const isOff = heatmapLayer === 'off'
+    map.setLayoutProperty('corridor-heat', 'visibility', isOff ? 'none' : 'visible')
+    if (!isOff) map.setPaintProperty('corridor-heat', 'heatmap-weight', heatmapWeightExpression(heatmapLayer, forecastHour))
+  }, [isMapReady, heatmapLayer, forecastHour])
+
   if (!MAPBOX_TOKEN) {
     return (
       <p className="map-message">
@@ -137,5 +206,19 @@ export default function RouteMap({ plan, selectedRouteId, onSelectRoute }) {
       </p>
     )
   }
-  return <div ref={containerRef} className="route-map" />
+  const forecastHours = plan?.corridor_forecast.hours ?? []
+  return (
+    <>
+      <div ref={containerRef} className="route-map" />
+      {forecastHours.length > 0 && (
+        <HeatmapControls
+          hours={forecastHours}
+          hour={forecastHour}
+          onHourChange={setForecastHour}
+          layer={heatmapLayer}
+          onLayerChange={setHeatmapLayer}
+        />
+      )}
+    </>
+  )
 }

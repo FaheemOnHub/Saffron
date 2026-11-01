@@ -436,3 +436,120 @@ p {
     animation: none !important;
   }
 }
+
+/* Heatmap controls: floating card over the bottom-left of the map. */
+
+.heatmap-controls {
+  position: absolute;
+  left: var(--space-4);
+  bottom: var(--space-5);
+  z-index: 1;
+  display: grid;
+  gap: var(--space-2);
+  width: min(360px, calc(100% - 2 * var(--space-4)));
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  background: var(--surface);
+  box-shadow: 0 2px 8px rgba(30, 42, 51, 0.15);
+}
+
+.heatmap-layers {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.heatmap-layers button {
+  min-height: 32px;
+  border: 0;
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.heatmap-layers button + button {
+  border-left: 1px solid var(--rule);
+}
+
+.heatmap-layers button.is-selected {
+  background: var(--interstate-blue);
+  color: #FFFFFF;
+}
+
+.heatmap-time {
+  display: grid;
+  grid-template-columns: 36px 1fr;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.play-button {
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--rule);
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--interstate-blue);
+  font-size: 0.8125rem;
+  cursor: pointer;
+}
+
+.heatmap-time input[type='range'] {
+  width: 100%;
+  accent-color: var(--interstate-blue);
+}
+
+.heatmap-time-label {
+  font-size: 0.875rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.heatmap-time-label span {
+  color: var(--ink-muted);
+}
+
+.heatmap-scale {
+  display: grid;
+  gap: 2px;
+}
+
+.heatmap-ramp {
+  height: 8px;
+  border: 1px solid var(--rule);
+  border-radius: 2px;
+}
+
+/* Ticks sit under the 25/50/75/100% marks, matching the 0-4 scale. */
+.heatmap-ticks {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  color: var(--ink-muted);
+  font-size: 0.75rem;
+  text-align: right;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+@media (max-width: 760px) {
+  /* Sits above the Mapbox logo and attribution, which must stay visible. */
+  .heatmap-controls {
+    left: var(--space-2);
+    bottom: 30px;
+    width: calc(100% - 2 * var(--space-2));
+    gap: 6px;
+    padding: var(--space-2) var(--space-3);
+  }
+
+  .heatmap-ticks {
+    font-size: 0.6875rem;
+  }
+}

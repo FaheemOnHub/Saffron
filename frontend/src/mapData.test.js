@@ -1,8 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import {
+  averageLatitude,
   boundsOfRoutes,
   checkpointPopupHtml,
   checkpointsGeoJson,
+  corridorGeoJson,
+  heatmapRadiusExpression,
+  heatmapWeightExpression,
   riskGradientExpression,
   routeLinesGeoJson,
 } from './mapData'
@@ -84,5 +88,48 @@ describe('checkpointPopupHtml', () => {
   })
   it('says when there is no forecast', () => {
     expect(checkpointPopupHtml(checkpoint(null, 25), LABELS, 0)).toContain('No forecast yet')
+  })
+})
+
+describe('corridor heatmap data', () => {
+  const corridor = {
+    points: [[40, -100], [41, -99]],
+    frames: {
+      risk: [[3, null], [0, 1]],
+      wind: [[2.5, null], [0.4, 1.2]],
+      rain: [[0, null], [0, 0]],
+      snow: [[0, null], [0, 0]],
+    },
+  }
+
+  it('puts every metric and hour on each point', () => {
+    const [first, second] = corridorGeoJson(corridor).features
+    expect(first.geometry.coordinates).toEqual([-100, 40])
+    expect(first.properties.risk0).toBe(3)
+    expect(first.properties.wind1).toBe(0.4)
+    expect(Object.keys(first.properties)).toHaveLength(8)
+    expect(second.properties.risk0).toBe(0) // null -> no heat
+    expect(second.properties.risk1).toBe(1)
+  })
+
+  it('reads the chosen metric and hour, scaled to 0-1', () => {
+    expect(heatmapWeightExpression('wind', 12)).toEqual(['/', ['get', 'wind12'], 4])
+  })
+
+  it('doubles the radius with each zoom level up to a cap', () => {
+    const [, , , , r0, , r9] = heatmapRadiusExpression(20_000, 0)
+    expect(r0).toBeCloseTo((20_000 * 1.5) / (40_075_016.686 / 512))
+    expect(r9 / r0).toBe(512)
+  })
+
+  it('widens the radius at higher latitudes, where pixels cover less ground', () => {
+    const equator = heatmapRadiusExpression(20_000, 0)[4]
+    const north = heatmapRadiusExpression(20_000, 60)[4]
+    expect(north / equator).toBeCloseTo(2)
+  })
+
+  it('averages latitude', () => {
+    expect(averageLatitude(corridor.points)).toBe(40.5)
+    expect(averageLatitude([])).toBe(0)
   })
 })

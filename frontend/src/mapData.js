@@ -103,3 +103,60 @@ export function checkpointPopupHtml(checkpoint, levelLabels, loadWeightLb) {
     notes.map((note) => `<p class="popup-note">${escapeHtml(note)}</p>`).join('') +
     `</div>`
 }
+
+// ---- Corridor heatmap ----
+
+export const HEATMAP_METRICS = ['risk', 'wind', 'rain', 'snow']
+
+// Property name holding one metric's value at one forecast hour, e.g. "wind12".
+export const heatmapProperty = (metric, hour) => `${metric}${hour}`
+
+// Every hour of every metric goes on each point up front. Moving the slider then
+// only changes which property the heatmap reads; no data is re-sent to the GPU.
+export function corridorGeoJson(corridor) {
+  return {
+    type: 'FeatureCollection',
+    features: corridor.points.map(([lat, lng], pointIndex) => {
+      const properties = {}
+      for (const metric of HEATMAP_METRICS) {
+        corridor.frames[metric].forEach((frame, hour) => {
+          // No forecast counts as no heat; these are rare (past the ~16-day horizon).
+          properties[heatmapProperty(metric, hour)] = frame[pointIndex] ?? 0
+        })
+      }
+      return { type: 'Feature', properties, geometry: { type: 'Point', coordinates: [lng, lat] } }
+    }),
+  }
+}
+
+// Values are on the 0-4 risk scale (0 Low ... 4 No Travel); heatmap weight wants 0-1.
+export function heatmapWeightExpression(metric, hour) {
+  return ['/', ['get', heatmapProperty(metric, hour)], 4]
+}
+
+// Mapbox GL tiles are 512 px, so one pixel at zoom 0 spans this many meters at the equator.
+const METERS_PER_PIXEL_AT_ZOOM_0 = 40_075_016.686 / 512
+// Mapbox draws each point as a Gaussian with sigma = radius / 3, peaking at
+// 0.4 * weight * intensity. At radius = 1.5 x grid spacing, a field of equal
+// weights sums to ~0.63 * weight * intensity; HEATMAP_INTENSITY (1.6) brings that
+// back to ~weight, so colors line up with the legend's 0-4 scale.
+const RADIUS_TO_SPACING = 1.5
+export const HEATMAP_INTENSITY = 1.6
+// Past this zoom the radius stops growing; huge kernels are slow and add nothing.
+const MAX_RADIUS_ZOOM = 9
+
+// Radius that keeps neighbouring grid points' blobs just overlapping at any zoom.
+export function heatmapRadiusExpression(spacingMeters, latitude) {
+  const radiusAtZoom0 = (spacingMeters * RADIUS_TO_SPACING) /
+    (METERS_PER_PIXEL_AT_ZOOM_0 * Math.cos((latitude * Math.PI) / 180))
+  return [
+    'interpolate', ['exponential', 2], ['zoom'],
+    0, radiusAtZoom0,
+    MAX_RADIUS_ZOOM, radiusAtZoom0 * 2 ** MAX_RADIUS_ZOOM,
+  ]
+}
+
+export function averageLatitude(points) {
+  if (points.length === 0) return 0
+  return points.reduce((sum, [lat]) => sum + lat, 0) / points.length
+}
