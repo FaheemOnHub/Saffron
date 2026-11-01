@@ -169,37 +169,119 @@ p {
 /* Checkpoint popup (rendered by Mapbox inside the map) */
 
 .mapboxgl-popup-content {
-  padding: var(--space-3) var(--space-4);
-  border-radius: 6px;
+  padding: 14px 16px 14px;
+  border-radius: 12px;
   font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+  color: var(--ink);
+  box-shadow: 0 8px 24px rgba(15, 27, 45, 0.18);
+}
+
+/* Mapbox's own × sits in the corner with no room; give it a proper target. */
+.mapboxgl-popup-close-button {
+  top: 10px;
+  right: 10px;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  color: var(--ink-muted);
+  font-size: 18px;
+  line-height: 1;
+}
+
+.mapboxgl-popup-close-button:hover {
+  background: var(--panel);
   color: var(--ink);
 }
 
 .popup {
   display: grid;
-  gap: var(--space-1);
+  gap: 10px;
+  min-width: 232px;
   font-size: 0.875rem;
   font-variant-numeric: tabular-nums;
 }
 
-.popup strong {
-  font-size: 1rem;
+.popup-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-right: 28px; /* clear of the close button */
+}
+
+.popup-head strong {
+  font-size: 1.0625rem;
+  font-weight: 800;
 }
 
 .popup-level {
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  padding: 2px 9px 2px 7px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--level) 16%, white);
+  font-size: 0.75rem;
   font-weight: 700;
 }
 
-.popup ul {
+.popup-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--level);
+}
+
+.popup-time {
+  color: var(--ink-muted);
+}
+
+.popup-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
   margin: 0;
-  padding: 0;
-  list-style: none;
+}
+
+.popup-stat {
+  display: grid;
+  gap: 1px;
+  padding: 7px 9px;
+  border-radius: 8px;
+  background: var(--panel);
+}
+
+/* The condition that set the level. */
+.popup-stat.is-cause {
+  background: color-mix(in srgb, var(--level) 14%, white);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--level) 45%, white);
+}
+
+.popup-stat dt {
+  color: var(--ink-muted);
+  font-size: 0.6875rem;
+  font-weight: 600;
+}
+
+.popup-stat dd {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--ink-muted);
+}
+
+.popup-stat-value {
+  color: var(--ink);
+  font-size: 1rem;
+  font-weight: 800;
+}
+
+.popup-stat-detail {
+  font-size: 0.6875rem;
 }
 
 .popup-note {
+  font-size: 0.8125rem;
   font-weight: 600;
 }
 

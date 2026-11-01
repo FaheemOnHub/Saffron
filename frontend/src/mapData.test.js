@@ -72,7 +72,8 @@ describe('checkpointPopupHtml', () => {
     const html = checkpointPopupHtml(checkpoint('high', 25, { distance_miles: 124.6 }), LABELS, 42000)
     expect(html).toContain('Mile 125')
     expect(html).toContain('High because of rain.')
-    expect(html).toContain('Rain 0.30 in/hr')
+    expect(html).toContain('<span class="popup-stat-value">0.30</span> in/hr')
+    expect(html).toMatch(/popup-stat is-cause[^>]*>\s*<dt>Rain/)
   })
   it('mentions the load rule and gusts when they apply', () => {
     const windy = checkpoint('severe', 25, { gust_warning: true })

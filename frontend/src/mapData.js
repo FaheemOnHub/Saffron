@@ -73,37 +73,54 @@ function drivingFactors(risk) {
   return factors.join(' and ')
 }
 
+// One weather reading as a small labelled stat. The condition that set the
+// checkpoint's level is tinted in that level's color.
+function statHtml(label, value, unit, detail, isCause, color) {
+  const tint = isCause ? ` is-cause" style="--level:${color}` : ''
+  return `<div class="popup-stat${tint}">` +
+    `<dt>${label}</dt>` +
+    `<dd><span class="popup-stat-value">${value}</span> ${unit}</dd>` +
+    (detail ? `<dd class="popup-stat-detail">${detail}</dd>` : '') +
+    '</div>'
+}
+
 export function checkpointPopupHtml(checkpoint, levelLabels, loadWeightLb) {
-  const heading = `Mile ${Math.round(checkpoint.distance_miles)}`
-  const arrival = `Arrive ${formatTime(checkpoint.eta)}`
+  const heading = `Mile ${Math.round(checkpoint.distance_miles).toLocaleString('en-US')}`
+  // Each checkpoint's time is in its own local zone (CST, MST...).
+  const arrival = `Arrives ${formatTime(checkpoint.eta, checkpoint.timezone)}`
   if (!checkpoint.forecast_available) {
-    return `<div class="popup"><strong>${heading}</strong><p>${arrival}</p>` +
-      '<p>No forecast yet for this time.</p></div>'
+    return '<div class="popup">' +
+      `<div class="popup-head"><strong>${heading}</strong></div>` +
+      `<p class="popup-time">${arrival}</p>` +
+      '<p class="popup-note">No forecast yet for this time.</p></div>'
   }
 
   const { weather, risk } = checkpoint
-  const levelLabel = levelLabels[risk.level]
-  const lines = [
-    `Wind ${Math.round(weather.wind_mph)} mph, gusts ${Math.round(weather.wind_gust_mph)} mph`,
-    `Rain ${weather.rain_in_per_hr.toFixed(2)} in/hr`,
-    `Snow ${weather.snow_in_per_hr.toFixed(2)} in/hr`,
-  ]
+  const levelLabel = escapeHtml(levelLabels[risk.level])
+  const color = riskColor(risk.level)
+  const isElevated = risk.level !== 'low'
+  const causes = isElevated ? drivingFactors(risk) : ''
   const notes = []
-  if (risk.level !== 'low') notes.push(`${levelLabel} because of ${drivingFactors(risk)}.`)
+  if (isElevated) notes.push(`${levelLabels[risk.level]} because of ${causes}.`)
   if (risk.raised_by_load) {
     notes.push(`Wind risk raised for the ${loadWeightLb.toLocaleString('en-US')} lb load.`)
   }
   if (checkpoint.gust_warning) notes.push('Gusts reach the High wind band.')
 
-  return `<div class="popup">` +
-    `<strong>${heading}</strong>` +
-    // Swatch plus dark text: white text on the amber/green levels isn't readable enough.
-    `<span class="popup-level"><span class="swatch" style="background:${riskColor(risk.level)}"></span>` +
-    `${escapeHtml(levelLabel)}</span>` +
-    `<p>${arrival}</p>` +
-    `<ul>${lines.map((line) => `<li>${line}</li>`).join('')}</ul>` +
+  return '<div class="popup">' +
+    '<div class="popup-head">' +
+      `<strong>${heading}</strong>` +
+      `<span class="popup-level" style="--level:${color}"><span class="popup-dot"></span>${levelLabel}</span>` +
+    '</div>' +
+    `<p class="popup-time">${arrival}</p>` +
+    '<dl class="popup-stats">' +
+      statHtml('Wind', Math.round(weather.wind_mph), 'mph', `gusts ${Math.round(weather.wind_gust_mph)}`,
+        causes.includes('wind'), color) +
+      statHtml('Rain', weather.rain_in_per_hr.toFixed(2), 'in/hr', '', causes.includes('rain'), color) +
+      statHtml('Snow', weather.snow_in_per_hr.toFixed(2), 'in/hr', '', causes.includes('snow'), color) +
+    '</dl>' +
     notes.map((note) => `<p class="popup-note">${escapeHtml(note)}</p>`).join('') +
-    `</div>`
+    '</div>'
 }
 
 // ---- Corridor heatmap ----
