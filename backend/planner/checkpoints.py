@@ -12,6 +12,7 @@ from datetime import datetime, timedelta
 from math import asin, cos, radians, sin, sqrt
 
 from planner.routing import RouteStretch
+from planner.timezones import timezone_name_at
 
 METERS_PER_MILE = 1609.344
 EARTH_RADIUS_M = 6_371_000
@@ -30,6 +31,7 @@ class Checkpoint:
     # Miles of road this checkpoint's weather stands for: halfway back to the
     # previous checkpoint and halfway on to the next. These add up to the route length.
     coverage_miles: float
+    timezone: str = "UTC"  # local zone at this point, for showing its ETA
 
 
 def haversine_m(point_a, point_b):
@@ -123,6 +125,7 @@ def place_checkpoints(route, interval_miles):
                 longitude=longitude,
                 eta=route.departure_time + timedelta(seconds=seconds_from_departure),
                 coverage_miles=(following_m - previous_m) / 2 / METERS_PER_MILE,
+                timezone=timezone_name_at(latitude, longitude),
             )
         )
     return checkpoints

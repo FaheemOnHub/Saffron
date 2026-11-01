@@ -8,7 +8,7 @@ from planner.assessment import assess_route, rank_routes, rate_checkpoints
 from planner.checkpoints import place_checkpoints
 from planner.corridor import CorridorForecast, CorridorGrid, HeatmapFrame
 from planner.routing import NoRouteError, PlaceNotFoundError, Place, RoutingError
-from planner.trip_planner import TripPlan
+from planner.trip_planner import DepartureError, TripPlan
 from planner.weather import WeatherError, WeatherReading
 from planner.tests.test_trip_planner import straight_route
 
@@ -72,7 +72,6 @@ class TripPlanValidationTests(SimpleTestCase):
 
     def test_departure_formats_and_window(self):
         self.assert_field_error("departure_time", departure_time="tomorrow morning")
-        self.assert_field_error("departure_time", departure_time="2026-11-02T08:00:00")  # no timezone
         self.assert_field_error("departure_time", departure_time=future(hours=-3))
         self.assert_field_error("departure_time", departure_time=future(hours=24 * 8))
 
@@ -202,3 +201,25 @@ class PlacesTests(SimpleTestCase):
     def test_upstream_failure_is_bad_gateway(self):
         with patch("planner.views.suggest_places", side_effect=RoutingError("HERE down")):
             self.assertEqual(self.client.get(self.url, {"q": "Srin"}).status_code, 502)
+
+
+class OriginLocalDepartureTests(SimpleTestCase):
+    url = reverse("trip-plan")
+
+    def test_departure_without_offset_is_passed_on_as_origin_local(self):
+        with patch("planner.views.plan_trip", return_value=sample_plan()) as mock_plan:
+            response = self.client.get(self.url, valid_params(departure_time="2026-11-03T08:00"))
+        self.assertEqual(response.status_code, 200)
+        self.assertIsNone(mock_plan.call_args.kwargs["departure_time"].tzinfo)
+
+    def test_origin_local_departure_out_of_window_is_a_field_error(self):
+        with patch("planner.views.plan_trip", side_effect=DepartureError("Departure can't be in the past.")):
+            response = self.client.get(self.url, valid_params(departure_time="2020-01-01T08:00"))
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("local time at the origin", response.json()["errors"]["departure_time"])
+
+    def test_place_and_checkpoint_timezones_are_serialized(self):
+        with patch("planner.views.plan_trip", return_value=sample_plan()):
+            body = self.client.get(self.url, valid_params()).json()
+        self.assertEqual(body["origin"]["timezone"], "UTC")
+        self.assertIn("timezone", body["routes"][0]["checkpoints"][0])

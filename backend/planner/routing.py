@@ -15,6 +15,8 @@ import flexpolyline
 import requests
 from django.conf import settings
 
+from planner.timezones import timezone_name_at
+
 HERE_GEOCODE_URL = "https://geocode.search.hereapi.com/v1/geocode"
 HERE_AUTOCOMPLETE_URL = "https://autocomplete.search.hereapi.com/v1/autocomplete"
 HERE_ROUTES_URL = "https://router.hereapi.com/v8/routes"
@@ -62,6 +64,7 @@ class Place:
     label: str
     latitude: float
     longitude: float
+    timezone: str = "UTC"  # IANA name, e.g. "America/Chicago"
 
 
 @dataclass(frozen=True)
@@ -115,10 +118,12 @@ def geocode_place(query):
     if not items:
         raise PlaceNotFoundError(f"Could not find a location for '{query}'.")
     best_match = items[0]
+    latitude, longitude = best_match["position"]["lat"], best_match["position"]["lng"]
     return Place(
         label=best_match.get("title", query),
-        latitude=best_match["position"]["lat"],
-        longitude=best_match["position"]["lng"],
+        latitude=latitude,
+        longitude=longitude,
+        timezone=timezone_name_at(latitude, longitude),
     )
 
 

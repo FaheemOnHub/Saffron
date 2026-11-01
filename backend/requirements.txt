@@ -3,3 +3,5 @@ requests>=2.32,<3
 python-dotenv>=1.0,<2
 flexpolyline>=0.1,<1
 gunicorn>=23,<24
+tzfpy>=2,<3
+tzdata>=2024.1

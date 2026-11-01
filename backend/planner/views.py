@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 
 from django.http import JsonResponse
 from django.views.decorators.http import require_GET
@@ -6,7 +6,7 @@ from django.views.decorators.http import require_GET
 from planner.checkpoints import CHECKPOINT_INTERVAL_OPTIONS_MILES
 from planner.routing import NoRouteError, PlaceNotFoundError, RoutingError, suggest_places
 from planner.serializers import serialize_trip_plan
-from planner.trip_planner import plan_trip
+from planner.trip_planner import DepartureError, check_departure_window, plan_trip
 from planner.weather import WeatherError
 
 MAX_PLACE_LENGTH = 200
@@ -15,11 +15,6 @@ MIN_SUGGEST_QUERY_LENGTH = 2
 # Loads above this are beyond any normal permit; likely a typo (e.g. kg vs lb).
 MAX_LOAD_WEIGHT_LB = 80_000
 DEFAULT_CHECKPOINT_INTERVAL_MILES = 25
-# A little slack so "leave now" still passes after the form sits open a while.
-DEPARTURE_PAST_GRACE = timedelta(hours=1)
-# Forecasts lose skill quickly past a week, and a multi-day trip still has to
-# fit inside Open-Meteo's ~16-day window.
-DEPARTURE_MAX_AHEAD = timedelta(days=7)
 
 
 def _parse_trip_request(query, now):
@@ -41,14 +36,15 @@ def _parse_trip_request(query, now):
     try:
         departure = datetime.fromisoformat(raw_departure)
     except ValueError:
-        errors["departure_time"] = "Use an ISO 8601 date-time with a timezone, e.g. 2026-11-02T08:00:00-06:00."
+        errors["departure_time"] = "Use an ISO 8601 date-time, e.g. 2026-11-02T08:00."
     else:
-        if departure.tzinfo is None:
-            errors["departure_time"] = "Include a timezone offset, e.g. -06:00 or Z."
-        elif departure < now - DEPARTURE_PAST_GRACE:
-            errors["departure_time"] = "Departure can't be in the past."
-        elif departure > now + DEPARTURE_MAX_AHEAD:
-            errors["departure_time"] = "Departure must be within the next 7 days so forecasts are reliable."
+        # Without an offset it's local time at the origin; plan_trip checks it
+        # once the origin's zone is known. With an offset we can check now.
+        if departure.tzinfo is not None:
+            try:
+                check_departure_window(departure, now)
+            except DepartureError as error:
+                errors["departure_time"] = str(error)
         cleaned["departure_time"] = departure
 
     raw_load = query.get("load_weight_lb", "").strip()
@@ -109,6 +105,8 @@ def trip_plan(request):
             load_weight_lb=cleaned["load_weight_lb"],
             checkpoint_interval_miles=cleaned["checkpoint_interval_miles"],
         )
+    except DepartureError as error:
+        return JsonResponse({"errors": {"departure_time": f"{error} (read as local time at the origin)"}}, status=400)
     except PlaceNotFoundError as error:
         return JsonResponse({"detail": str(error)}, status=400)
     except NoRouteError as error:

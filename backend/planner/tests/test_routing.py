@@ -64,7 +64,7 @@ class GeocodeTests(SimpleTestCase):
             {"items": [{"title": "Dallas, TX, United States", "position": {"lat": 32.77, "lng": -96.79}}]}
         )
         place = geocode_place("  Dallas ")
-        self.assertEqual(place, Place("Dallas, TX, United States", 32.77, -96.79))
+        self.assertEqual(place, Place("Dallas, TX, United States", 32.77, -96.79, "America/Chicago"))
         self.assertEqual(mock_get.call_args.kwargs["params"]["q"], "Dallas")
 
     @patch("planner.routing.requests.get")

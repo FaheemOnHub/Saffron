@@ -12,7 +12,7 @@ def level_key(level):
 
 
 def _place(place):
-    return {"label": place.label, "lat": place.latitude, "lng": place.longitude}
+    return {"label": place.label, "lat": place.latitude, "lng": place.longitude, "timezone": place.timezone}
 
 
 def _checkpoint(rated):
@@ -23,6 +23,7 @@ def _checkpoint(rated):
         "lat": round(checkpoint.latitude, COORDINATE_DECIMALS),
         "lng": round(checkpoint.longitude, COORDINATE_DECIMALS),
         "eta": checkpoint.eta.isoformat(),
+        "timezone": checkpoint.timezone,
         "coverage_miles": round(checkpoint.coverage_miles, 2),
         "forecast_available": weather is not None,
         "weather": None if weather is None else {

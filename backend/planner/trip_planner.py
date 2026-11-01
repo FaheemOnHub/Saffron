@@ -5,12 +5,33 @@ geocode -> truck routes -> checkpoints -> weather -> risk -> ranking.
 
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
 
 from planner.assessment import assess_route, rank_routes, rate_checkpoints
 from planner.checkpoints import place_checkpoints
 from planner.corridor import corridor_forecast
 from planner.routing import fetch_route_options, geocode_place
+from planner.timezones import localize
 from planner.weather import ForecastRequest, forecast_for
+
+
+# A little slack so "leave now" still passes after the form sits open a while.
+DEPARTURE_PAST_GRACE = timedelta(hours=1)
+# Forecasts lose skill quickly past a week, and a multi-day trip still has to
+# fit inside the forecast window.
+DEPARTURE_MAX_AHEAD = timedelta(days=7)
+
+
+class DepartureError(ValueError):
+    """The departure is in the past or too far ahead."""
+
+
+def check_departure_window(departure, now=None):
+    now = now or datetime.now(timezone.utc)
+    if departure < now - DEPARTURE_PAST_GRACE:
+        raise DepartureError("Departure can't be in the past.")
+    if departure > now + DEPARTURE_MAX_AHEAD:
+        raise DepartureError("Departure must be within the next 7 days so forecasts are reliable.")
 
 
 @dataclass(frozen=True)
@@ -24,7 +45,11 @@ class TripPlan:
 
 
 def plan_trip(origin_query, destination_query, departure_time, load_weight_lb, checkpoint_interval_miles):
+    """`departure_time` without a timezone is the origin's local wall-clock time."""
     origin = geocode_place(origin_query)
+    if departure_time.tzinfo is None:
+        departure_time = localize(departure_time, origin.timezone)
+        check_departure_window(departure_time)
     destination = geocode_place(destination_query)
     routes = fetch_route_options(origin, destination, departure_time, load_weight_lb)
     checkpoints_per_route = [place_checkpoints(route, checkpoint_interval_miles) for route in routes]
