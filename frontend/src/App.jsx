@@ -1,7 +1,11 @@
-import { useRef, useState } from 'react'
+import { Suspense, lazy, useRef, useState } from 'react'
 import { fetchTripPlan } from './api'
 import RouteList from './components/RouteList'
 import TripForm from './components/TripForm'
+
+// mapbox-gl is most of the JavaScript; loading it separately lets the form
+// appear and work while the map is still downloading.
+const RouteMap = lazy(() => import('./components/RouteMap'))
 
 export default function App() {
   const [plan, setPlan] = useState(null)
@@ -54,7 +58,9 @@ export default function App() {
       </aside>
 
       <main className="map-area" aria-label="Map">
-        <p className="map-placeholder">The map arrives in the next step.</p>
+        <Suspense fallback={<p className="map-message">Loading map…</p>}>
+          <RouteMap plan={plan} selectedRouteId={selectedRouteId} onSelectRoute={setSelectedRouteId} />
+        </Suspense>
       </main>
     </div>
   )
