@@ -1,12 +1,16 @@
+<p align="center">
+  <img src="frontend/public/brand/road-1.webp" alt="Saffron logo" width="120">
+</p>
+
 # Saffron
 
 Pick the safest truck route between two places, based on forecast weather along the way, the load weight, and travel time.
 
-You enter an origin, a destination, a departure time and a load weight. Saffron gets up to 3 truck routes, checks the forecast at checkpoints every 10, 25 or 50 miles (for the hour the truck will actually be there), rates each checkpoint with the risk rules, and recommends a route. The map shows every route, the checkpoints with their ETAs and risk, and a weather heatmap along the corridor with a 0–48 hour slider.
+You enter an origin, a destination, a departure time and a load weight. Saffron gets up to 3 truck routes, checks the forecast at checkpoints every 10, 25 or 50 miles (for the hour the truck will actually be there), rates each checkpoint with the risk rules, and recommends a route. The map shows every route, the checkpoints with their ETAs and risk, and a weather heatmap along the corridor driven by a 0–48 hour trip timeline.
 
 **Live:** [saffron-inky.vercel.app](https://saffron-inky.vercel.app/) (API on Railway: [health check](https://saffron-production-279d.up.railway.app/api/health))
 
-Built with Django for the API, React and Vite for the UI, Mapbox GL for the map, HERE for geocoding and truck routing, and Open-Meteo for forecasts.
+Built with Django for the API; React, Vite, Tailwind and shadcn/ui for the UI, Mapbox GL for the map; HERE for geocoding, place suggestions and truck routing; and Open-Meteo for forecasts.
 
 ## Run it locally
 
@@ -40,7 +44,7 @@ npm run dev                   # http://localhost:5173
    4. shortest travel time
 
    Routes with any No Travel miles always rank last. The recommended route says which rule decided it.
-6. **Heatmap.** A grid of up to 150 points within 30 miles of the routes, with 49 hourly forecasts each. The slider only changes which hour the map reads, so it doesn't refetch.
+6. **Heatmap.** A grid of up to 150 points within 30 miles of the routes, with 49 hourly forecasts each. The timeline only changes which hour the map reads, so it doesn't refetch.
 
 ## Assumptions and decisions
 
@@ -65,8 +69,12 @@ backend/planner/
   assessment.py    per-route risk summary and ranking
   corridor.py      heatmap grid and hourly frames
   trip_planner.py  runs the pipeline
-  views.py         GET /api/trip-plan, GET /api/health
+  views.py         GET /api/trip-plan, GET /api/places, GET /api/health
 frontend/src/
-  components/      TripForm, RouteList, RiskStrip, RouteMap, HeatmapControls
+  components/      TripForm, PlaceCombobox, DepartureTimePicker, RouteList,
+                   CompareDialog, RouteMap, TripTimeline, PlanningOverlay
+  components/ui/   shadcn/ui building blocks
   mapData.js       plan -> Mapbox sources and expressions
+  timeline.js      timeline bands and truck position
+frontend/public/brand/  logo frames (also the loading animation)
 ```
