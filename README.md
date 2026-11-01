@@ -56,7 +56,7 @@ npm run dev                   # http://localhost:5173
 - **Miles with no forecast are counted separately** and left out of the average, not treated as Low.
 - **Departure must be within the next 7 days**, so forecasts are meaningful and long trips stay inside Open-Meteo's ~16-day range.
 - **Heatmap hour 0 is the departure hour.** The Wind/Rain/Snow layers are drawn on the same 0–4 scale as risk, using each condition's own thresholds. They are for display only and never affect the ranking.
-- **Times are shown in the viewer's timezone**, with the zone name.
+- **Times are local to the place they describe**, with the zone abbreviation: departure at the origin, arrival at the destination, each checkpoint in its own zone (a Chicago to Denver trip goes from CST to MST). The departure you enter is read as local time at the origin. Zones come from the coordinates via an offline boundary lookup (tzfpy), so no extra API calls.
 
 ## Project layout
 

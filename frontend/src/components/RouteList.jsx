@@ -37,7 +37,7 @@ function RiskCallouts({ summary, levelLabels }) {
   )
 }
 
-function RouteCard({ route, isSelected, onSelect, levelLabels }) {
+function RouteCard({ route, isSelected, onSelect, levelLabels, destinationTimezone }) {
   return (
     <li>
       <button
@@ -61,7 +61,7 @@ function RouteCard({ route, isSelected, onSelect, levelLabels }) {
         <span className="flex flex-wrap gap-x-4 gap-y-0.5 text-sm text-muted-foreground tabular-nums">
           <span><strong className="font-bold text-foreground">{formatDuration(route.duration_s)}</strong> driving</span>
           <span>{formatMiles(route.distance_miles)}</span>
-          <span>Arrive {formatTime(route.arrival_time)}</span>
+          <span>Arrive {formatTime(route.arrival_time, destinationTimezone)}</span>
         </span>
 
         <RiskStrip checkpoints={route.checkpoints} levelLabels={levelLabels} />
@@ -108,6 +108,7 @@ export default function RouteList({ plan, selectedRouteId, onSelectRoute }) {
             isSelected={route.id === selectedRouteId}
             onSelect={onSelectRoute}
             levelLabels={levelLabels}
+            destinationTimezone={plan.destination.timezone}
           />
         ))}
       </ol>

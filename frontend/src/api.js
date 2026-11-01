@@ -11,8 +11,9 @@ export function buildTripPlanQuery({ origin, destination, departureTime, loadWei
   return new URLSearchParams({
     origin: origin.trim(),
     destination: destination.trim(),
-    // The datetime-local input has no timezone; Date reads it as browser local time.
-    departure_time: new Date(departureTime).toISOString(),
+    // Sent without an offset on purpose: the backend reads it as local time at
+    // the origin ("leave Chicago at 8 AM" means 8 AM in Chicago).
+    departure_time: departureTime,
     load_weight_lb: String(loadWeightLb),
     checkpoint_interval_miles: String(checkpointIntervalMiles),
   }).toString()

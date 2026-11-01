@@ -1,6 +1,6 @@
 import { ArrowDown, Pencil } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { formatDepartureLabel } from '@/format'
+import { formatDepartureLabel, timezoneAbbreviation } from '@/format'
 
 // The planned trip in a few lines, shown in place of the form so the results
 // start near the top of the panel.
@@ -18,7 +18,10 @@ export default function TripSummary({ plan, trip, onEdit }) {
         </Button>
       </div>
       <ul className="flex flex-wrap gap-1.5 text-[0.8125rem] text-muted-foreground">
-        <li className="rounded-full bg-muted px-2.5 py-1">{formatDepartureLabel(trip.departureTime)}</li>
+        <li className="rounded-full bg-muted px-2.5 py-1">
+          Departs {formatDepartureLabel(trip.departureTime)}{' '}
+          {timezoneAbbreviation(plan.origin.timezone, new Date(plan.routes[0].departure_time))}
+        </li>
         <li className="rounded-full bg-muted px-2.5 py-1">{plan.load_weight_lb.toLocaleString('en-US')} lb</li>
         <li className="rounded-full bg-muted px-2.5 py-1">Weather every {plan.checkpoint_interval_miles} mi</li>
       </ul>

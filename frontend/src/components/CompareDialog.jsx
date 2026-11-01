@@ -72,7 +72,7 @@ export default function CompareDialog({ plan, isOpen, onClose, levelLabels }) {
             <tr className="is-detail">
               <th scope="row">Arrives</th>
               {plan.routes.map((route) => (
-                <td key={route.id} className={columnClass(route)}>{formatTime(route.arrival_time)}</td>
+                <td key={route.id} className={columnClass(route)}>{formatTime(route.arrival_time, plan.destination.timezone)}</td>
               ))}
             </tr>
             <tr className="is-detail">

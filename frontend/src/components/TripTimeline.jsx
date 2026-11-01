@@ -62,7 +62,8 @@ export default function TripTimeline({ plan, selectedRouteId, onSelectRoute, hou
     setIsPlaying(!isPlaying)
   }
 
-  const timeLabel = `+${hour} h, ${formatTime(hours[hour])}`
+  // One clock for the whole timeline: the origin's, so scrubbing never jumps zones.
+  const timeLabel = `+${hour} h, ${formatTime(hours[hour], plan.origin.timezone)}`
 
   return (
     <section className="trip-timeline" aria-label="Trip timeline">

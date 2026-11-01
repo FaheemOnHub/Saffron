@@ -68,9 +68,14 @@ export default function TripForm({ onPlan, isPlanning, fieldErrors, hidden }) {
 
       <div className="grid grid-cols-[minmax(0,1fr)_8.5rem] items-start gap-3">
         <div className="grid gap-1.5">
-          <Label htmlFor="departure_time">Departure</Label>
+          <div className="flex items-baseline justify-between gap-2">
+            <Label htmlFor="departure_time">Departure</Label>
+            <span id="departure-hint" className="truncate text-xs text-muted-foreground">local time at origin</span>
+          </div>
           <DepartureTimePicker
-            id="departure_time" value={departureTime} onChange={setDepartureTime} {...errorFor('departure_time')}
+            id="departure_time" value={departureTime} onChange={setDepartureTime}
+            invalid={Boolean(fieldErrors.departure_time)}
+            describedBy={fieldErrors.departure_time ? 'departure-hint departure_time-error' : 'departure-hint'}
           />
           <FieldError id="departure_time-error" message={fieldErrors.departure_time} />
         </div>

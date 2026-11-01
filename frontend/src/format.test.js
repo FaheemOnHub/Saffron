@@ -8,6 +8,8 @@ import {
   joinLocalDateTime,
   nextQuarterHourLocal,
   splitLocalDateTime,
+  formatTime,
+  timezoneAbbreviation,
 } from './format'
 
 describe('formatDuration', () => {
@@ -56,5 +58,25 @@ describe('departure picker helpers', () => {
   it('formats clock times and the trigger label', () => {
     expect([formatClockTime('00:00'), formatClockTime('12:30'), formatClockTime('21:05')]).toEqual(['12:00 AM', '12:30 PM', '9:05 PM'])
     expect(formatDepartureLabel('2026-11-02T08:15')).toBe('Mon, Nov 2 at 8:15 AM')
+  })
+})
+
+
+describe('times in a place\'s own zone', () => {
+  const moment = '2026-11-02T18:35:00Z'
+
+  it('formats wall-clock time with the zone abbreviation', () => {
+    expect(formatTime(moment, 'America/Chicago')).toBe('Mon, 12:35 PM CST')
+    expect(formatTime(moment, 'America/Denver')).toBe('Mon, 11:35 AM MST')
+    expect(formatTime(moment, 'Asia/Kolkata')).toBe('Tue, 12:05 AM IST')
+  })
+
+  it('prefers a real abbreviation over a GMT offset', () => {
+    expect(timezoneAbbreviation('Asia/Kolkata', new Date(moment))).toBe('IST')
+    expect(timezoneAbbreviation('Europe/Paris', new Date(moment))).toBe('CET')
+  })
+
+  it('follows daylight saving', () => {
+    expect(formatTime('2026-07-01T18:00:00Z', 'America/Chicago')).toBe('Wed, 1:00 PM CDT')
   })
 })

@@ -10,17 +10,34 @@ export function formatMiles(miles) {
   return `${Math.round(miles).toLocaleString('en-US')} mi`
 }
 
-// Times show in the viewer's timezone, with the zone named so a driver
-// crossing zones isn't misled.
-const timeFormatter = new Intl.DateTimeFormat('en-US', {
-  weekday: 'short',
-  hour: 'numeric',
-  minute: '2-digit',
-  timeZoneName: 'short',
-})
+// English locales tried in turn for a zone's short name: en-US knows CST/MST,
+// en-IN knows IST, en-GB knows BST/CET, en-AU knows AEST. Whichever gives a
+// real abbreviation (not "GMT+5:30") wins.
+const ABBREVIATION_LOCALES = ['en-US', 'en-GB', 'en-IN', 'en-AU']
+const OFFSET_STYLE = /^(GMT|UTC)[+\-−]/
 
-export function formatTime(isoString) {
-  return timeFormatter.format(new Date(isoString))
+export function timezoneAbbreviation(timeZone, date) {
+  let fallback = ''
+  for (const locale of ABBREVIATION_LOCALES) {
+    const name = new Intl.DateTimeFormat(locale, { timeZone, timeZoneName: 'short' })
+      .formatToParts(date)
+      .find((part) => part.type === 'timeZoneName')?.value ?? ''
+    if (name && !OFFSET_STYLE.test(name)) return name
+    fallback ||= name
+  }
+  return fallback
+}
+
+// A moment as wall-clock time in a given zone, with the zone named, e.g.
+// "Mon, 12:35 PM CST". Times describe a place, so they're shown in that
+// place's zone (the origin for departure, the destination for arrival).
+// Without a zone, the viewer's own is used.
+export function formatTime(isoString, timeZone) {
+  const date = new Date(isoString)
+  const weekday = new Intl.DateTimeFormat('en-US', { weekday: 'short', timeZone }).format(date)
+  const clock = new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit', timeZone }).format(date)
+  const zone = timezoneAbbreviation(timeZone ?? Intl.DateTimeFormat().resolvedOptions().timeZone, date)
+  return `${weekday}, ${clock} ${zone}`
 }
 
 // Default departure: the next quarter hour, in the format datetime-local expects.

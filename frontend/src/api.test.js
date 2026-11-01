@@ -20,10 +20,10 @@ function mockFetch(status, body) {
 afterEach(() => vi.restoreAllMocks())
 
 describe('buildTripPlanQuery', () => {
-  it('trims places and sends departure as UTC ISO', () => {
+  it('trims places and sends departure as origin-local wall-clock time', () => {
     const params = new URLSearchParams(buildTripPlanQuery(trip))
     expect(params.get('origin')).toBe('Dallas, TX')
-    expect(params.get('departure_time')).toBe(new Date('2026-11-02T08:00').toISOString())
+    expect(params.get('departure_time')).toBe('2026-11-02T08:00')
     expect(params.get('checkpoint_interval_miles')).toBe('25')
   })
 })
