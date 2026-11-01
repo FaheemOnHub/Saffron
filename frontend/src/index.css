@@ -553,3 +553,140 @@ button:disabled {
     font-size: 0.6875rem;
   }
 }
+
+/* Route comparison dialog */
+
+.compare-button {
+  justify-self: start;
+  min-height: 44px;
+  margin-top: var(--space-3);
+  padding: 0 var(--space-4);
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--interstate-blue);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.compare-button:hover {
+  border-color: var(--interstate-blue);
+}
+
+.compare-dialog {
+  width: min(1100px, calc(100vw - 2 * var(--space-4)));
+  max-height: calc(100dvh - 2 * var(--space-5));
+  padding: 0;
+  border: 0;
+  border-radius: 10px;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+  box-shadow: 0 12px 40px rgba(30, 42, 51, 0.25);
+}
+
+.compare-dialog::backdrop {
+  background: rgba(30, 42, 51, 0.45);
+}
+
+.compare-header {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-4);
+  padding: var(--space-5) var(--space-5) var(--space-4);
+}
+
+.compare-header h2 {
+  font-size: 1.5rem;
+  font-weight: 800;
+}
+
+.compare-header p {
+  margin-top: var(--space-1);
+  color: var(--ink-muted);
+}
+
+.close-button {
+  flex: 0 0 44px;
+  height: 44px;
+  margin-left: auto;
+  border: 1px solid var(--rule);
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-size: 1.5rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.compare-scroll {
+  overflow-x: auto;
+  padding: 0 var(--space-5) var(--space-5);
+}
+
+.compare-table {
+  width: 100%;
+  min-width: 720px;
+  border-collapse: collapse;
+  font-size: 0.9375rem;
+  text-align: left;
+}
+
+.compare-table th,
+.compare-table td {
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid #E3E8EB;
+  vertical-align: top;
+}
+
+.compare-table thead th {
+  border-bottom: 1px solid var(--rule);
+}
+
+.compare-table tbody th {
+  width: 26%;
+  font-weight: 600;
+}
+
+.compare-rank {
+  display: block;
+  color: var(--ink-muted);
+  font-size: 0.8125rem;
+  font-weight: 700;
+}
+
+.compare-route {
+  display: block;
+  font-size: 1.125rem;
+  font-weight: 800;
+}
+
+/* Recommended column: tinted band so the eye can follow it down the table. */
+.compare-table .is-recommended {
+  background: #EAF0F9;
+}
+
+.compare-table th.is-recommended .compare-rank {
+  color: var(--interstate-blue);
+}
+
+.compare-table tr.is-deciding {
+  background: #FFF8EC;
+}
+
+.compare-table tr.is-detail th {
+  color: var(--ink-muted);
+}
+
+.decides-tag {
+  display: block;
+  width: fit-content;
+  margin-top: var(--space-1);
+  padding: 2px var(--space-2);
+  border-radius: 4px;
+  background: var(--ink);
+  color: #FFFFFF;
+  font-size: 0.75rem;
+  font-weight: 700;
+}

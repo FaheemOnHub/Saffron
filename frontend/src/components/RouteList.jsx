@@ -1,5 +1,8 @@
+import { useState } from 'react'
+import { routeName } from '../compare'
 import { formatDuration, formatMiles, formatTime } from '../format'
 import { riskColor } from '../risk'
+import CompareDialog from './CompareDialog'
 import RiskStrip from './RiskStrip'
 
 // Only levels a driver needs to act on get a line; Low/Moderate stay in the strip.
@@ -37,7 +40,7 @@ function RouteCard({ route, isSelected, onSelect, levelLabels }) {
         onClick={() => onSelect(route.id)}
       >
         <span className="route-heading">
-          <span className="route-name">Route {route.rank}</span>
+          <span className="route-name">{route.rank}. {routeName(route)}</span>
           {route.is_recommended && <span className="badge">Recommended</span>}
           {route.is_detour && <span className="tag">Forced detour</span>}
         </span>
@@ -59,6 +62,7 @@ function RouteCard({ route, isSelected, onSelect, levelLabels }) {
 
 export default function RouteList({ plan, selectedRouteId, onSelectRoute }) {
   const levelLabels = Object.fromEntries(plan.risk_levels.map((level) => [level.key, level.label]))
+  const [isComparing, setIsComparing] = useState(false)
 
   return (
     <section className="route-list" aria-labelledby="route-list-heading">
@@ -82,6 +86,17 @@ export default function RouteList({ plan, selectedRouteId, onSelectRoute }) {
           />
         ))}
       </ol>
+      {plan.routes.length > 1 && (
+        <button type="button" className="compare-button" onClick={() => setIsComparing(true)}>
+          Compare routes side by side
+        </button>
+      )}
+      <CompareDialog
+        plan={plan}
+        isOpen={isComparing}
+        onClose={() => setIsComparing(false)}
+        levelLabels={levelLabels}
+      />
       <ul className="legend" aria-label="Risk levels">
         {plan.risk_levels.map((level) => (
           <li key={level.key}>
