@@ -1,5 +1,9 @@
 @import "tailwindcss";
 
+/* shadcn components carry dark: styles. Without this, Tailwind applies them
+   whenever the OS is in dark mode, greying fields on our light-only page. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 /*
  * Design tokens. The shadcn/ui components read the semantic names
  * (--primary, --border, ...); colors come from the Saffron logo:
@@ -66,6 +70,13 @@
   * {
     @apply border-border outline-ring/50;
   }
+
+  /* Default keyboard focus ring. In the base layer, so a component that draws
+     its own focus style (e.g. the place field's ring) can switch it off. */
+  :focus-visible {
+    outline: 3px solid var(--interstate-blue);
+    outline-offset: 2px;
+  }
 }
 
 :root {
@@ -109,10 +120,6 @@ p {
   margin: 0;
 }
 
-:focus-visible {
-  outline: 3px solid var(--interstate-blue);
-  outline-offset: 2px;
-}
 
 /* Layout: panel left, map fills the rest. */
 
@@ -498,6 +505,8 @@ p {
 }
 
 .compare-dialog {
+  /* Tailwind's reset sets margin: 0; a modal dialog is centered by auto margins. */
+  margin: auto;
   width: min(1100px, calc(100vw - 2 * var(--space-4)));
   max-height: calc(100dvh - 2 * var(--space-5));
   padding: 0;
@@ -530,6 +539,8 @@ p {
 }
 
 .close-button {
+  display: grid;
+  place-items: center;
   flex: 0 0 44px;
   height: 44px;
   margin-left: auto;

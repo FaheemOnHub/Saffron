@@ -99,7 +99,7 @@ export default function PlaceCombobox({ id, value, onChange, placeholder, invali
           onFocus={() => setIsOpen(true)}
           onBlur={() => setIsOpen(false)}
           onKeyDown={handleKeyDown}
-          className="h-full w-full min-w-0 bg-transparent text-[0.9375rem] outline-none placeholder:text-muted-foreground"
+          className="h-full w-full min-w-0 bg-transparent text-[0.9375rem] outline-none placeholder:text-muted-foreground focus-visible:outline-none"
         />
         {isLoading && <Loader2 className="size-4 shrink-0 animate-spin text-muted-foreground" aria-hidden="true" />}
       </div>

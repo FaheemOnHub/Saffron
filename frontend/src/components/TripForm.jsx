@@ -40,27 +40,30 @@ export default function TripForm({ onPlan, isPlanning, fieldErrors, hidden }) {
 
   return (
     <form className="grid gap-4" onSubmit={handleSubmit} noValidate hidden={hidden}>
-      <div className="relative grid gap-3">
+      <div className="grid gap-3">
         <div className="grid gap-1.5">
           <Label htmlFor="origin">From</Label>
           <PlaceCombobox id="origin" value={origin} onChange={setOrigin} placeholder="City or address" {...errorFor('origin')} />
           <FieldError id="origin-error" message={fieldErrors.origin} />
         </div>
         <div className="grid gap-1.5">
-          <Label htmlFor="destination">To</Label>
+          {/* Swap sits on the label row so it never covers a field. */}
+          <div className="flex items-center justify-between">
+            <Label htmlFor="destination">To</Label>
+            <Button
+              type="button" variant="ghost" size="sm" onClick={swapPlaces}
+              aria-label="Swap From and To"
+              className="h-7 gap-1 px-2 text-xs text-muted-foreground"
+            >
+              <ArrowDownUp className="size-3.5" aria-hidden="true" /> Swap
+            </Button>
+          </div>
           <PlaceCombobox
             id="destination" value={destination} onChange={setDestination}
             placeholder="City or address" {...errorFor('destination')}
           />
           <FieldError id="destination-error" message={fieldErrors.destination} />
         </div>
-        <Button
-          type="button" variant="outline" size="icon" onClick={swapPlaces}
-          aria-label="Swap From and To"
-          className="absolute top-[4.6rem] right-0 z-10 size-8 rounded-full bg-card shadow-sm"
-        >
-          <ArrowDownUp className="size-3.5" aria-hidden="true" />
-        </Button>
       </div>
 
       <div className="grid grid-cols-[minmax(0,1fr)_8.5rem] items-start gap-3">

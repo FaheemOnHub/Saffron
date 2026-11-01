@@ -1,3 +1,4 @@
+import { X } from 'lucide-react'
 import { useEffect, useRef } from 'react'
 import { ordinal, rankingRows, routeName } from '../compare'
 import { formatMiles, formatTime } from '../format'
@@ -24,7 +25,9 @@ export default function CompareDialog({ plan, isOpen, onClose, levelLabels }) {
           <h2 id="compare-heading">Compare routes</h2>
           <p>Rows follow the ranking rules, top to bottom. A tag marks the rule that decided each place.</p>
         </div>
-        <button type="button" className="close-button" onClick={onClose} aria-label="Close comparison">×</button>
+        <button type="button" className="close-button" onClick={onClose} aria-label="Close comparison">
+          <X className="size-5" aria-hidden="true" />
+        </button>
       </div>
 
       <div className="compare-scroll">
