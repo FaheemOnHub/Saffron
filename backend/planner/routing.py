@@ -45,6 +45,14 @@ class RoutingError(Exception):
     """A place can't be found, no route exists, or the HERE API failed."""
 
 
+class PlaceNotFoundError(RoutingError):
+    """The geocoder had no match for what the driver typed."""
+
+
+class NoRouteError(RoutingError):
+    """Both places exist but HERE has no truck route between them."""
+
+
 @dataclass(frozen=True)
 class Place:
     label: str
@@ -95,11 +103,11 @@ def _call_here(url, params):
 def geocode_place(query):
     query = (query or "").strip()
     if not query:
-        raise RoutingError("Place name is empty.")
+        raise PlaceNotFoundError("Place name is empty.")
     data = _call_here(HERE_GEOCODE_URL, {"q": query, "limit": 1})
     items = data.get("items") or []
     if not items:
-        raise RoutingError(f"Could not find a location for '{query}'.")
+        raise PlaceNotFoundError(f"Could not find a location for '{query}'.")
     best_match = items[0]
     return Place(
         label=best_match.get("title", query),
@@ -171,7 +179,7 @@ def fetch_truck_routes(origin, destination, departure_time, load_weight_lb, via=
     data = _call_here(HERE_ROUTES_URL, params)
     routes = [_parse_route(route_data) for route_data in data.get("routes", [])]
     if not routes:
-        raise RoutingError("HERE found no truck route between these places.")
+        raise NoRouteError("HERE found no truck route between these places.")
     return sorted(routes, key=lambda route: route.duration_s)
 
 
