@@ -169,3 +169,10 @@ class TripPlanResponseTests(SimpleTestCase):
         with patch("planner.views.plan_trip", return_value=sample_plan()):
             response = self.client.get(self.url, valid_params(), HTTP_ACCEPT_ENCODING="gzip")
         self.assertEqual(response.headers.get("Content-Encoding"), "gzip")
+
+
+class HealthTests(SimpleTestCase):
+    def test_health_is_ok(self):
+        response = self.client.get(reverse("health"))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {"status": "ok"})

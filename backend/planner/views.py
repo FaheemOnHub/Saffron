@@ -75,6 +75,12 @@ def _parse_trip_request(query, now):
 
 
 @require_GET
+def health(request):
+    """Liveness check for the host; doesn't call any third-party API."""
+    return JsonResponse({"status": "ok"})
+
+
+@require_GET
 def trip_plan(request):
     cleaned, errors = _parse_trip_request(request.GET, now=datetime.now(timezone.utc))
     if errors:
