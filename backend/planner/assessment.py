@@ -45,6 +45,8 @@ class RouteAssessment:
     rank: int = 0
     is_recommended: bool = False
     recommendation_reason: str = ""
+    # Rule that puts this route ahead of the next-ranked one (None if last or tied).
+    beats_next_on: object = None
 
     @property
     def severe_miles(self):
@@ -105,19 +107,27 @@ def assess_route(route, rated_checkpoints):
     )
 
 
-# (label, value getter, unit) in priority order. Shared by the sort key and the
-# explanation, so the reason shown to the driver always matches the real ranking.
+# (key, label, value getter, unit) in priority order. Shared by the sort key and
+# the explanations, so what the driver is told always matches the real ranking.
 RANKING_CRITERIA = (
-    ("No Travel miles", lambda a: round(a.no_travel_miles, MILES_PRECISION), "mi"),
-    ("Severe miles", lambda a: round(a.severe_miles, MILES_PRECISION), "mi"),
-    ("High miles", lambda a: round(a.high_miles, MILES_PRECISION), "mi"),
-    ("average risk", lambda a: round(a.average_risk, AVERAGE_RISK_PRECISION), ""),
-    ("travel time", lambda a: a.route.duration_s, "s"),
+    ("no_travel_miles", "No Travel miles", lambda a: round(a.no_travel_miles, MILES_PRECISION), "mi"),
+    ("severe_miles", "Severe miles", lambda a: round(a.severe_miles, MILES_PRECISION), "mi"),
+    ("high_miles", "High miles", lambda a: round(a.high_miles, MILES_PRECISION), "mi"),
+    ("average_risk", "average risk", lambda a: round(a.average_risk, AVERAGE_RISK_PRECISION), ""),
+    ("travel_time", "travel time", lambda a: a.route.duration_s, "s"),
 )
 
 
 def _ranking_key(assessment):
-    return tuple(value_of(assessment) for _, value_of, _ in RANKING_CRITERIA)
+    return tuple(value_of(assessment) for _, _, value_of, _ in RANKING_CRITERIA)
+
+
+def _deciding_rule(better, worse):
+    """Key of the first ranking rule where `better` beats `worse`, or None on a full tie."""
+    for key, _, value_of, _ in RANKING_CRITERIA:
+        if value_of(better) != value_of(worse):
+            return key
+    return None
 
 
 def _format_value(value, unit):
@@ -131,7 +141,7 @@ def _format_value(value, unit):
 
 def _explain(winner, runner_up):
     """Name the first criterion where the winner beats the runner-up."""
-    for label, value_of, unit in RANKING_CRITERIA:
+    for _, label, value_of, unit in RANKING_CRITERIA:
         best, next_best = value_of(winner), value_of(runner_up)
         if best == next_best:
             continue
@@ -150,6 +160,8 @@ def rank_routes(assessments):
     for position, assessment in enumerate(ranked, start=1):
         assessment.rank = position
         assessment.is_recommended = position == 1
+    for better, worse in zip(ranked, ranked[1:]):
+        better.beats_next_on = _deciding_rule(better, worse)
     if len(ranked) == 1:
         ranked[0].recommendation_reason = "Only route available."
     elif ranked:

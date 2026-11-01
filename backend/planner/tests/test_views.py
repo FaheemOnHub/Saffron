@@ -136,8 +136,13 @@ class TripPlanResponseTests(SimpleTestCase):
         self.assertEqual([level["key"] for level in body["risk_levels"]],
                          ["low", "moderate", "high", "severe", "no_travel"])
 
+        self.assertEqual([rule["key"] for rule in body["ranking_rules"]],
+                         ["no_travel_miles", "severe_miles", "high_miles", "average_risk", "travel_time"])
+
         route = body["routes"][0]
         self.assertEqual(route["id"], "route-1")
+        self.assertEqual(route["highways"], [])
+        self.assertIsNone(route["beats_next_on"])
         self.assertTrue(route["is_recommended"])
         self.assertFalse(route["is_detour"])
         self.assertEqual(route["distance_miles"], 50.0)

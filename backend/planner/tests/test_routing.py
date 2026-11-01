@@ -153,6 +153,33 @@ class FetchTruckRoutesTests(SimpleTestCase):
         self.assertEqual(mock_get.call_args.kwargs["params"]["via"], "31.5,-96.2!passThrough=true")
 
     @patch("planner.routing.requests.get")
+    def test_route_is_named_after_its_longest_highways(self, mock_get):
+        def numbers(*pairs):
+            return [{"value": value, "routeType": route_type} for value, route_type in pairs]
+
+        section = here_section(
+            points=[(41.0, -88.0), (41.0, -95.0), (41.0, -100.0), (40.0, -104.0)],
+            spans=[
+                # I-80 shares pavement with US-6 here; only the interstate should count.
+                {"offset": 0, "length": 600_000, "duration": 20_000, "routeNumbers": numbers(("US-6", 2), ("I-80", 1))},
+                {"offset": 1, "length": 300_000, "duration": 10_000, "routeNumbers": numbers(("I-76", 1))},
+                {"offset": 2, "length": 50_000, "duration": 2_000, "routeNumbers": numbers(("CO-2", 3))},
+                {"offset": 3, "length": 10_000, "duration": 600},
+            ],
+            length_m=960_000, duration_s=32_600,
+            departs="2026-11-02T08:00:00+00:00", arrives="2026-11-02T17:03:20+00:00",
+        )
+        mock_get.return_value = fake_response({"routes": [{"sections": [section]}]})
+        route = fetch_truck_routes(DALLAS, HOUSTON, DEPARTURE, load_weight_lb=0)[0]
+        self.assertEqual(route.highways, ("I-80", "I-76"))
+        self.assertIn("routeNumbers", mock_get.call_args.kwargs["params"]["spans"])
+
+    @patch("planner.routing.requests.get")
+    def test_route_without_route_numbers_has_no_highways(self, mock_get):
+        mock_get.return_value = fake_response({"routes": [here_route(14_400)]})
+        self.assertEqual(fetch_truck_routes(DALLAS, HOUSTON, DEPARTURE, load_weight_lb=0)[0].highways, ())
+
+    @patch("planner.routing.requests.get")
     def test_no_routes_raises(self, mock_get):
         mock_get.return_value = fake_response({"routes": []})
         with self.assertRaisesMessage(RoutingError, "no truck route"):

@@ -6,6 +6,7 @@ flexible polyline format) stays in this module, so the rest of the planner
 works with plain Place / TruckRoute objects.
 """
 
+from collections import Counter
 from dataclasses import dataclass, replace
 from datetime import datetime
 from math import cos, radians
@@ -34,6 +35,8 @@ MAX_DETOUR_DURATION_RATIO = 2.0
 # Overlap is measured on a ~1 km grid (2 decimal places of lat/lng).
 SAME_ROAD_OVERLAP_RATIO = 0.9
 ROAD_GRID_DECIMALS = 2
+# A route is named after the highways it spends the most miles on.
+HIGHWAY_NAME_COUNT = 2
 
 KG_PER_LB = 0.45359237
 # The driver enters cargo weight, but truck routing needs gross weight.
@@ -79,6 +82,8 @@ class TruckRoute:
     arrival_time: datetime
     # Set when we forced this route through a detour point; None for HERE's own routes.
     detour_via: tuple = None
+    # Main highways by miles driven, e.g. ("I-80", "I-76"); empty when HERE has none.
+    highways: tuple = ()
 
 
 def _call_here(url, params):
@@ -120,17 +125,33 @@ def gross_weight_kg(load_weight_lb):
     return round((EMPTY_TRUCK_WEIGHT_LB + load_weight_lb) * KG_PER_LB)
 
 
+def _main_highway(span):
+    """The span's most important route number (lowest HERE routeType), if any.
+
+    Roads often carry several numbers at once (I-80 shares pavement with US-6);
+    counting only the top-class one keeps a route from being named twice.
+    """
+    numbers = span.get("routeNumbers") or []
+    if not numbers:
+        return None
+    return min(numbers, key=lambda number: number.get("routeType", 99))["value"]
+
+
 def _parse_route(route_data):
     """Join a HERE route's sections into one continuous path with stretches."""
     path = []
     stretches = []
     distance_m = 0
     duration_s = 0
+    meters_by_highway = Counter()
     for section in route_data["sections"]:
         section_points = flexpolyline.decode(section["polyline"])
         # Span offsets point into this section's polyline; shift them onto the joined path.
         points_before_section = len(path)
         for span in section.get("spans", []):
+            highway = _main_highway(span)
+            if highway:
+                meters_by_highway[highway] += span["length"]
             stretches.append(
                 RouteStretch(
                     start_point_index=points_before_section + span["offset"],
@@ -150,6 +171,7 @@ def _parse_route(route_data):
         duration_s=duration_s,
         departure_time=datetime.fromisoformat(sections[0]["departure"]["time"]),
         arrival_time=datetime.fromisoformat(sections[-1]["arrival"]["time"]),
+        highways=tuple(name for name, _ in meters_by_highway.most_common(HIGHWAY_NAME_COUNT)),
     )
 
 
@@ -170,7 +192,8 @@ def fetch_truck_routes(origin, destination, departure_time, load_weight_lb, via=
         # HERE merges spans unless a requested attribute changes along the road.
         # dynamicSpeedInfo splits them wherever the expected speed changes, which
         # is exactly where per-stretch drive times matter for checkpoint ETAs.
-        "spans": "dynamicSpeedInfo,length,duration",
+        # routeNumbers names the highway each span is on.
+        "spans": "dynamicSpeedInfo,routeNumbers,length,duration",
         "vehicle[grossWeight]": gross_weight_kg(load_weight_lb),
     }
     if via is not None:

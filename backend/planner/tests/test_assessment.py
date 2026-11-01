@@ -152,3 +152,16 @@ class RankingOutputTests(SimpleTestCase):
         only = rank_routes([assessed([(100, LOW)])])
         self.assertEqual(only[0].recommendation_reason, "Only route available.")
         self.assertEqual(rank_routes([]), [])
+
+
+class DecidingRuleTests(SimpleTestCase):
+    def test_each_route_records_the_rule_that_puts_it_ahead_of_the_next(self):
+        no_severe_few_high = assessed([(25, HIGH), (75, LOW)], duration_s=9000)
+        no_severe_more_high = assessed([(60, HIGH), (40, LOW)], duration_s=7000)
+        some_severe = assessed([(40, SEVERE), (60, LOW)], duration_s=5000)
+        ranked = rank_routes([some_severe, no_severe_more_high, no_severe_few_high])
+        self.assertEqual([a.beats_next_on for a in ranked], ["high_miles", "severe_miles", None])
+
+    def test_full_tie_has_no_deciding_rule(self):
+        ranked = rank_routes([assessed([(100, LOW)]), assessed([(100, LOW)])])
+        self.assertIsNone(ranked[0].beats_next_on)

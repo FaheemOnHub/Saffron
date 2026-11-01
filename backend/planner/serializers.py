@@ -1,5 +1,6 @@
 """Turn planner results into the JSON shape the React app reads."""
 
+from planner.assessment import RANKING_CRITERIA
 from planner.risk import RiskLevel
 
 # Plenty for a map line: 5 decimals of lat/lng is about 1 m.
@@ -49,6 +50,8 @@ def _route(assessment):
         "rank": assessment.rank,
         "is_recommended": assessment.is_recommended,
         "recommendation_reason": assessment.recommendation_reason,
+        "beats_next_on": assessment.beats_next_on,
+        "highways": list(route.highways),
         "is_detour": route.detour_via is not None,
         "distance_miles": round(route.distance_m / 1609.344, 1),
         "duration_s": route.duration_s,
@@ -95,6 +98,8 @@ def serialize_trip_plan(plan):
         "load_weight_lb": plan.load_weight_lb,
         "checkpoint_interval_miles": plan.checkpoint_interval_miles,
         "risk_levels": [{"key": level_key(level), "label": level.label, "value": int(level)} for level in RiskLevel],
+        # Ranking rules in priority order, so the UI can lay out comparisons the same way.
+        "ranking_rules": [{"key": key, "label": label} for key, label, _, _ in RANKING_CRITERIA],
         "routes": [_route(assessment) for assessment in plan.routes],
         "corridor_forecast": _corridor(plan.corridor),
     }
