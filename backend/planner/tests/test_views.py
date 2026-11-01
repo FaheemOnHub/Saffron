@@ -6,6 +6,7 @@ from django.urls import reverse
 
 from planner.assessment import assess_route, rank_routes, rate_checkpoints
 from planner.checkpoints import place_checkpoints
+from planner.corridor import CorridorForecast, CorridorGrid, HeatmapFrame
 from planner.routing import NoRouteError, PlaceNotFoundError, Place, RoutingError
 from planner.trip_planner import TripPlan
 from planner.weather import WeatherError, WeatherReading
@@ -39,6 +40,13 @@ def sample_plan():
         load_weight_lb=42_000,
         checkpoint_interval_miles=25,
         routes=rank_routes([assessment]),
+        corridor=CorridorForecast(
+            grid=CorridorGrid(points=[(32.5, -96.6), (31.0, -96.0)], spacing_m=9656),
+            frames=[
+                HeatmapFrame(route.departure_time, [3, None], [2.5, None], [0.0, None], [0.0, None]),
+                HeatmapFrame(route.departure_time, [1, 0], [1.2, 0.4], [0.0, 0.0], [0.0, 0.0]),
+            ],
+        ),
     )
 
 
@@ -148,6 +156,14 @@ class TripPlanResponseTests(SimpleTestCase):
         self.assertEqual(summary["worst_level"], "severe")
         self.assertEqual(summary["miles_by_level"]["severe"], 12.5)
         self.assertEqual(summary["unknown_miles"], 37.5)
+
+    def test_corridor_forecast_shape(self):
+        with patch("planner.views.plan_trip", return_value=sample_plan()):
+            corridor = self.client.get(self.url, valid_params()).json()["corridor_forecast"]
+        self.assertEqual(corridor["points"], [[32.5, -96.6], [31.0, -96.0]])
+        self.assertEqual(len(corridor["hours"]), 2)
+        self.assertEqual(corridor["frames"]["risk"], [[3, None], [1, 0]])
+        self.assertEqual(corridor["frames"]["wind"][0], [2.5, None])
 
     def test_large_responses_are_gzipped(self):
         with patch("planner.views.plan_trip", return_value=sample_plan()):

@@ -70,6 +70,24 @@ def _route(assessment):
     }
 
 
+def _corridor(forecast):
+    """Frame-major arrays: frames[metric][hour][point], aligned with `points`."""
+    frames = forecast.frames
+    return {
+        "spacing_m": round(forecast.grid.spacing_m),
+        "points": [
+            [round(lat, COORDINATE_DECIMALS), round(lng, COORDINATE_DECIMALS)] for lat, lng in forecast.grid.points
+        ],
+        "hours": [frame.hour.isoformat() for frame in frames],
+        "frames": {
+            "risk": [frame.risk_levels for frame in frames],
+            "wind": [frame.wind_scores for frame in frames],
+            "rain": [frame.rain_scores for frame in frames],
+            "snow": [frame.snow_scores for frame in frames],
+        },
+    }
+
+
 def serialize_trip_plan(plan):
     return {
         "origin": _place(plan.origin),
@@ -78,4 +96,5 @@ def serialize_trip_plan(plan):
         "checkpoint_interval_miles": plan.checkpoint_interval_miles,
         "risk_levels": [{"key": level_key(level), "label": level.label, "value": int(level)} for level in RiskLevel],
         "routes": [_route(assessment) for assessment in plan.routes],
+        "corridor_forecast": _corridor(plan.corridor),
     }

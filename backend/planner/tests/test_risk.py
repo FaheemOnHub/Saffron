@@ -1,12 +1,16 @@
 from django.test import SimpleTestCase
 
 from planner.risk import (
+    RAIN_SCORE_ANCHORS,
+    SNOW_SCORE_ANCHORS,
+    WIND_SCORE_ANCHORS,
     RiskLevel,
     apply_load_rules,
     assess_checkpoint,
     classify_rain,
     classify_snow,
     classify_wind,
+    condition_score,
 )
 
 LOW, MODERATE, HIGH, SEVERE, NO_TRAVEL = RiskLevel
@@ -105,3 +109,16 @@ class AssessCheckpointTests(SimpleTestCase):
 
     def test_label_is_human_readable(self):
         self.assertEqual(NO_TRAVEL.label, "No Travel")
+
+
+class ConditionScoreTests(SimpleTestCase):
+    def test_band_floors_score_whole_levels(self):
+        self.assertEqual([condition_score(v, WIND_SCORE_ANCHORS) for v in (0, 25, 35, 45, 55)], [0, 1, 2, 3, 4])
+        self.assertEqual([condition_score(v, RAIN_SCORE_ANCHORS) for v in (0, 0.10, 0.25, 0.50, 1.00)], [0, 1, 2, 3, 4])
+        self.assertEqual([condition_score(v, SNOW_SCORE_ANCHORS) for v in (0, 0.5, 1.0, 2.0, 3.0)], [0, 1, 2, 3, 4])
+
+    def test_between_floors_interpolates_and_caps(self):
+        self.assertAlmostEqual(condition_score(30, WIND_SCORE_ANCHORS), 1.5)
+        self.assertAlmostEqual(condition_score(0.75, RAIN_SCORE_ANCHORS), 3.5)
+        self.assertEqual(condition_score(90, WIND_SCORE_ANCHORS), 4.0)
+        self.assertEqual(condition_score(-1, WIND_SCORE_ANCHORS), 0.0)

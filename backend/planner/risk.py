@@ -100,3 +100,22 @@ def assess_checkpoint(wind_mph, rain_in_per_hr, snow_in_per_hr, load_weight_lb):
         snow_level=snow_level,
         raised_by_load=wind_level != base_wind_level,
     )
+
+
+# Continuous 0-4 scores for the heatmap only (never used for ranking).
+# Each condition's band floors map to whole levels and values in between are
+# interpolated, so wind, rain, and snow share one color scale with risk levels.
+WIND_SCORE_ANCHORS = (0, *WIND_LEVEL_FLOORS_MPH)
+RAIN_SCORE_ANCHORS = (0, *RAIN_LEVEL_FLOORS_IN_PER_HR, RAIN_NO_TRAVEL_ABOVE_IN_PER_HR)
+SNOW_SCORE_ANCHORS = (0, *SNOW_LEVEL_FLOORS_IN_PER_HR, SNOW_NO_TRAVEL_ABOVE_IN_PER_HR)
+
+
+def condition_score(reading, anchors):
+    """Map a reading onto 0-4: anchors[i] scores i, linear between, capped at 4."""
+    if reading <= 0:
+        return 0.0
+    for level in range(1, len(anchors)):
+        if reading < anchors[level]:
+            lower, upper = anchors[level - 1], anchors[level]
+            return level - 1 + (reading - lower) / (upper - lower)
+    return float(len(anchors) - 1)

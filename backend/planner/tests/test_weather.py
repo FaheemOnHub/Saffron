@@ -9,6 +9,7 @@ from planner.weather import (
     ForecastRequest,
     WeatherError,
     forecast_for,
+    hourly_forecasts,
 )
 
 NOW = datetime(2026, 11, 2, 6, 0, tzinfo=timezone.utc)
@@ -187,3 +188,33 @@ class FailureTests(SimpleTestCase):
         mock_get.return_value = fake_response([hourly_location(start, 3)])
         with self.assertRaisesMessage(WeatherError, "1 forecasts for 2 points"):
             forecast_for([ForecastRequest(32.0, -96.0, start)] * 2, now=NOW)
+
+
+class HourlyForecastsTests(SimpleTestCase):
+    @patch("planner.weather.requests.get")
+    def test_returns_each_hour_for_each_point(self, mock_get):
+        start = datetime(2026, 11, 2, 7, 0, tzinfo=timezone.utc)
+        mock_get.return_value = fake_response([
+            hourly_location(start, 6, wind=[1.0, 2.0, 3.0, 4.0, 5.0, 6.0]),
+            hourly_location(start, 6, wind=[10.0, 20.0, 30.0, 40.0, 50.0, 60.0]),
+        ])
+        series = hourly_forecasts([(32.0, -96.0), (31.0, -95.0)], start + timedelta(hours=1, minutes=40), 3, now=NOW)
+        # First hour floors to 08:00, so hours are 08:00, 09:00, 10:00.
+        self.assertEqual([r.wind_mph for r in series[0]], [2.0, 3.0, 4.0])
+        self.assertEqual([r.wind_mph for r in series[1]], [20.0, 30.0, 40.0])
+        params = mock_get.call_args.kwargs["params"]
+        self.assertEqual(params["start_hour"], "2026-11-02T07:00")
+        self.assertEqual(params["end_hour"], "2026-11-02T11:00")
+
+    @patch("planner.weather.requests.get")
+    def test_hours_past_horizon_are_none(self, mock_get):
+        start = NOW + timedelta(days=15) - timedelta(hours=2)
+        mock_get.return_value = fake_response(hourly_location(start - timedelta(hours=1), 4))
+        series = hourly_forecasts([(32.0, -96.0)], start, 4, now=NOW)
+        # Horizon is NOW + 15 days = 06:00, inclusive; the 07:00 hour is past it.
+        self.assertEqual(mock_get.call_args.kwargs["params"]["end_hour"], "2026-11-17T06:00")
+        self.assertEqual([r is None for r in series[0]], [False, False, False, True])
+
+    def test_naive_first_hour_is_rejected(self):
+        with self.assertRaises(ValueError):
+            hourly_forecasts([(32.0, -96.0)], datetime(2026, 11, 2, 8, 0), 3, now=NOW)

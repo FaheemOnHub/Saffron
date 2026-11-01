@@ -32,11 +32,12 @@ def stormy():
     return WeatherReading(5.0, 8.0, 0.7, 0.0, DEPARTURE)  # Severe rain
 
 
+@patch("planner.trip_planner.corridor_forecast", return_value="corridor-forecast")
 @patch("planner.trip_planner.forecast_for")
 @patch("planner.trip_planner.fetch_route_options")
 @patch("planner.trip_planner.geocode_place", side_effect=[DALLAS, HOUSTON])
 class PlanTripTests(SimpleTestCase):
-    def test_weather_goes_to_the_right_route_and_safer_route_wins(self, _geocode, mock_routes, mock_forecast):
+    def test_weather_goes_to_the_right_route_and_safer_route_wins(self, _geocode, mock_routes, mock_forecast, _corridor):
         fast_but_stormy = straight_route(miles=50, hours=1, longitude=-96.8)
         slow_but_calm = straight_route(miles=50, hours=2, longitude=-96.5)
         mock_routes.return_value = [fast_but_stormy, slow_but_calm]
@@ -54,7 +55,7 @@ class PlanTripTests(SimpleTestCase):
         self.assertAlmostEqual(other.severe_miles, 50)
         self.assertTrue(best.is_recommended)
 
-    def test_passes_inputs_through(self, mock_geocode, mock_routes, mock_forecast):
+    def test_passes_inputs_through(self, mock_geocode, mock_routes, mock_forecast, mock_corridor):
         mock_routes.return_value = [straight_route(miles=50, hours=1, longitude=-96.8)]
         mock_forecast.return_value = [calm()] * 6
 
@@ -65,3 +66,5 @@ class PlanTripTests(SimpleTestCase):
         self.assertEqual(len(plan.routes[0].checkpoints), 6)  # 0,10,20,30,40,50
         self.assertEqual(plan.checkpoint_interval_miles, 10)
         self.assertEqual(plan.origin, DALLAS)
+        mock_corridor.assert_called_once_with(mock_routes.return_value, DEPARTURE, 42_000)
+        self.assertEqual(plan.corridor, "corridor-forecast")
