@@ -51,7 +51,8 @@ describe('riskGradientExpression', () => {
   })
   it('is a plain color when the whole route is one level', () => {
     const calm = { ...route, checkpoints: [checkpoint('low', 10), checkpoint('low', 10)] }
-    expect(riskGradientExpression(calm)).toEqual(['step', ['line-progress'], RISK_COLORS.low])
+    // Mapbox rejects a 'step' with no stops, so this must not be an expression.
+    expect(riskGradientExpression(calm)).toBe(RISK_COLORS.low)
   })
   it('skips zero-mile segments so stops keep increasing', () => {
     const odd = { ...route, checkpoints: [checkpoint('low', 10), checkpoint('high', 0), checkpoint('severe', 10)] }

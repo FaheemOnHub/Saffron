@@ -4,6 +4,8 @@ Pick the safest truck route between two places, based on forecast weather along 
 
 You enter an origin, a destination, a departure time and a load weight. Saffron gets up to 3 truck routes, checks the forecast at checkpoints every 10, 25 or 50 miles (for the hour the truck will actually be there), rates each checkpoint with the risk rules, and recommends a route. The map shows every route, the checkpoints with their ETAs and risk, and a weather heatmap along the corridor with a 0–48 hour slider.
 
+**Live:** [saffron-inky.vercel.app](https://saffron-inky.vercel.app/) (API on Railway: [health check](https://saffron-production-279d.up.railway.app/api/health))
+
 Built with Django for the API, React and Vite for the UI, Mapbox GL for the map, HERE for geocoding and truck routing, and Open-Meteo for forecasts.
 
 ## Run it locally

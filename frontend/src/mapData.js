@@ -36,6 +36,8 @@ export function riskGradientExpression(route) {
   const segments = riskSegments(route.checkpoints).filter((segment) => segment.miles > 0)
   const totalMiles = segments.reduce((sum, segment) => sum + segment.miles, 0)
   if (segments.length === 0 || totalMiles === 0) return riskColor(route.checkpoints[0]?.risk?.level)
+  // A 'step' needs at least one stop, so a route with a single level is a plain color.
+  if (segments.length === 1) return riskColor(segments[0].level)
 
   const expression = ['step', ['line-progress'], riskColor(segments[0].level)]
   let milesSoFar = 0
