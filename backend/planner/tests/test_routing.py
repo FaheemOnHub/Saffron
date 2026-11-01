@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+from math import cos, radians
 from unittest.mock import Mock, patch
 
 import flexpolyline
@@ -8,6 +9,10 @@ from django.test import SimpleTestCase, override_settings
 from planner.routing import (
     Place,
     RoutingError,
+    TruckRoute,
+    _detour_point,
+    _mostly_same_road,
+    fetch_route_options,
     fetch_truck_routes,
     geocode_place,
     gross_weight_kg,
@@ -142,6 +147,12 @@ class FetchTruckRoutesTests(SimpleTestCase):
         self.assertEqual(route.arrival_time.isoformat(), "2026-11-02T08:00:15+00:00")
 
     @patch("planner.routing.requests.get")
+    def test_via_point_is_sent_as_pass_through(self, mock_get):
+        mock_get.return_value = fake_response({"routes": [here_route(14_400)]})
+        fetch_truck_routes(DALLAS, HOUSTON, DEPARTURE, load_weight_lb=0, via=(31.5, -96.2))
+        self.assertEqual(mock_get.call_args.kwargs["params"]["via"], "31.5,-96.2!passThrough=true")
+
+    @patch("planner.routing.requests.get")
     def test_no_routes_raises(self, mock_get):
         mock_get.return_value = fake_response({"routes": []})
         with self.assertRaisesMessage(RoutingError, "no truck route"):
@@ -156,3 +167,85 @@ class GrossWeightTests(SimpleTestCase):
     def test_adds_empty_truck_and_converts_to_kg(self):
         # 35,000 + 45,000 = 80,000 lb, the US federal gross limit.
         self.assertEqual(gross_weight_kg(45_000), 36_287)
+
+
+def simple_route(duration_s, path):
+    departs = datetime(2026, 11, 2, 8, 0, tzinfo=timezone.utc)
+    return TruckRoute(
+        path=path, stretches=[], distance_m=1000, duration_s=duration_s,
+        departure_time=departs, arrival_time=departs,
+    )
+
+
+# A straight north-south road and a parallel one ~50 km east of it.
+MAIN_ROAD = [(30 + i * 0.01, -96.0) for i in range(100)]
+PARALLEL_ROAD = [(30 + i * 0.01, -95.5) for i in range(100)]
+THIRD_ROAD = [(30 + i * 0.01, -95.0) for i in range(100)]
+
+
+class DetourPointTests(SimpleTestCase):
+    def test_point_is_beside_midpoint_of_north_bound_trip(self):
+        south, north = Place("A", 30.0, -96.0), Place("B", 31.0, -96.0)
+        left_lat, left_lng = _detour_point(south, north, 0.2)
+        right_lat, right_lng = _detour_point(south, north, -0.2)
+        # Travelling north, left is west and right is east; latitude stays at the midpoint.
+        self.assertAlmostEqual(left_lat, 30.5)
+        self.assertAlmostEqual(right_lat, 30.5)
+        self.assertLess(left_lng, -96.0)
+        self.assertGreater(right_lng, -96.0)
+
+    def test_offset_is_same_ground_distance_as_fraction_of_trip(self):
+        west, east = Place("A", 45.0, -100.0), Place("B", 45.0, -98.0)
+        lat, lng = _detour_point(west, east, 0.2)
+        # Trip runs east, so +0.2 is north; 2 deg lng at 45N ~= 1.414 deg lat of ground.
+        self.assertAlmostEqual(lat - 45.0, 2 * cos(radians(45)) * 0.2)
+        self.assertAlmostEqual(lng, -99.0)
+
+
+class SameRoadTests(SimpleTestCase):
+    def test_identical_and_parallel_roads(self):
+        self.assertTrue(_mostly_same_road(simple_route(1, MAIN_ROAD), simple_route(1, MAIN_ROAD)))
+        self.assertFalse(_mostly_same_road(simple_route(1, MAIN_ROAD), simple_route(1, PARALLEL_ROAD)))
+
+    def test_out_and_back_spur_counts_as_same_road(self):
+        spur = MAIN_ROAD[:50] + [(30.49, -96.0 + i * 0.01) for i in range(1, 5)] + MAIN_ROAD[50:]
+        # Main road is fully contained in the spur route, so they're the same option.
+        self.assertTrue(_mostly_same_road(simple_route(1, MAIN_ROAD), simple_route(1, spur)))
+
+
+@patch("planner.routing.fetch_truck_routes")
+class FetchRouteOptionsTests(SimpleTestCase):
+    def test_no_detours_when_here_returns_three(self, mock_fetch):
+        mock_fetch.return_value = [simple_route(100, MAIN_ROAD), simple_route(110, PARALLEL_ROAD),
+                                   simple_route(120, THIRD_ROAD)]
+        routes = fetch_route_options(DALLAS, HOUSTON, DEPARTURE, 0)
+        self.assertEqual(len(routes), 3)
+        self.assertEqual(mock_fetch.call_count, 1)
+
+    def test_fills_gap_with_distinct_detour(self, mock_fetch):
+        mock_fetch.side_effect = [
+            [simple_route(100, MAIN_ROAD), simple_route(110, PARALLEL_ROAD)],
+            [simple_route(150, THIRD_ROAD)],
+        ]
+        routes = fetch_route_options(DALLAS, HOUSTON, DEPARTURE, 0)
+        self.assertEqual([r.duration_s for r in routes], [100, 110, 150])
+        self.assertIsNone(routes[0].detour_via)
+        self.assertIsNotNone(routes[2].detour_via)
+        self.assertIn("via", mock_fetch.call_args.kwargs)
+
+    def test_rejects_slow_duplicate_and_failed_detours(self, mock_fetch):
+        mock_fetch.side_effect = [
+            [simple_route(100, MAIN_ROAD)],
+            [simple_route(201, PARALLEL_ROAD)],   # over 2x the fastest time
+            [simple_route(120, MAIN_ROAD)],       # same road as the main route
+            RoutingError("no route"),             # detour point unreachable
+            [simple_route(150, THIRD_ROAD)],      # accepted
+        ]
+        routes = fetch_route_options(DALLAS, HOUSTON, DEPARTURE, 0)
+        self.assertEqual([r.duration_s for r in routes], [100, 150])
+        self.assertEqual(mock_fetch.call_count, 5)
+
+    def test_initial_failure_is_not_swallowed(self, mock_fetch):
+        mock_fetch.side_effect = RoutingError("HERE found no truck route")
+        with self.assertRaises(RoutingError):
+            fetch_route_options(DALLAS, HOUSTON, DEPARTURE, 0)
