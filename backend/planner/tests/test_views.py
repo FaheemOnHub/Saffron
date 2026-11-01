@@ -181,3 +181,24 @@ class HealthTests(SimpleTestCase):
         response = self.client.get(reverse("health"))
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json(), {"status": "ok"})
+
+
+class PlacesTests(SimpleTestCase):
+    url = reverse("places")
+
+    def test_short_query_returns_nothing_without_calling_here(self):
+        with patch("planner.views.suggest_places") as mock_suggest:
+            response = self.client.get(self.url, {"q": " S "})
+        self.assertEqual(response.json(), {"suggestions": []})
+        mock_suggest.assert_not_called()
+
+    def test_returns_suggestions(self):
+        suggestion = {"id": "here:1", "label": "Srinagar, Jammu & Kashmir, India", "type": "locality"}
+        with patch("planner.views.suggest_places", return_value=[suggestion]) as mock_suggest:
+            response = self.client.get(self.url, {"q": "Srin"})
+        mock_suggest.assert_called_once_with("Srin")
+        self.assertEqual(response.json(), {"suggestions": [suggestion]})
+
+    def test_upstream_failure_is_bad_gateway(self):
+        with patch("planner.views.suggest_places", side_effect=RoutingError("HERE down")):
+            self.assertEqual(self.client.get(self.url, {"q": "Srin"}).status_code, 502)

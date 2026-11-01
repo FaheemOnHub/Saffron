@@ -4,12 +4,14 @@ from django.http import JsonResponse
 from django.views.decorators.http import require_GET
 
 from planner.checkpoints import CHECKPOINT_INTERVAL_OPTIONS_MILES
-from planner.routing import NoRouteError, PlaceNotFoundError, RoutingError
+from planner.routing import NoRouteError, PlaceNotFoundError, RoutingError, suggest_places
 from planner.serializers import serialize_trip_plan
 from planner.trip_planner import plan_trip
 from planner.weather import WeatherError
 
 MAX_PLACE_LENGTH = 200
+# Below this, autocomplete matches are too broad to be useful.
+MIN_SUGGEST_QUERY_LENGTH = 2
 # Loads above this are beyond any normal permit; likely a typo (e.g. kg vs lb).
 MAX_LOAD_WEIGHT_LB = 80_000
 DEFAULT_CHECKPOINT_INTERVAL_MILES = 25
@@ -78,6 +80,19 @@ def _parse_trip_request(query, now):
 def health(request):
     """Liveness check for the host; doesn't call any third-party API."""
     return JsonResponse({"status": "ok"})
+
+
+@require_GET
+def places(request):
+    """Autocomplete suggestions for the From/To fields."""
+    query = request.GET.get("q", "").strip()[:MAX_PLACE_LENGTH]
+    if len(query) < MIN_SUGGEST_QUERY_LENGTH:
+        return JsonResponse({"suggestions": []})
+    try:
+        suggestions = suggest_places(query)
+    except RoutingError as error:
+        return JsonResponse({"detail": str(error)}, status=502)
+    return JsonResponse({"suggestions": suggestions})
 
 
 @require_GET

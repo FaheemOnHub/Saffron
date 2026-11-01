@@ -16,6 +16,7 @@ import requests
 from django.conf import settings
 
 HERE_GEOCODE_URL = "https://geocode.search.hereapi.com/v1/geocode"
+HERE_AUTOCOMPLETE_URL = "https://autocomplete.search.hereapi.com/v1/autocomplete"
 HERE_ROUTES_URL = "https://router.hereapi.com/v8/routes"
 REQUEST_TIMEOUT_SECONDS = 20
 
@@ -119,6 +120,21 @@ def geocode_place(query):
         latitude=best_match["position"]["lat"],
         longitude=best_match["position"]["lng"],
     )
+
+
+def suggest_places(partial_query, limit=6):
+    """Place names matching what the driver has typed so far, for the form's dropdown.
+
+    Labels are full addresses ("Srinagar, Jammu & Kashmir, India"), which also
+    tell same-named towns apart and geocode back to the intended place.
+    """
+    data = _call_here(HERE_AUTOCOMPLETE_URL, {"q": partial_query, "limit": limit})
+    suggestions = []
+    for item in data.get("items", []):
+        label = (item.get("address") or {}).get("label") or item.get("title")
+        if label and label not in (suggestion["label"] for suggestion in suggestions):
+            suggestions.append({"id": item.get("id", label), "label": label, "type": item.get("resultType", "")})
+    return suggestions
 
 
 def gross_weight_kg(load_weight_lb):

@@ -16,6 +16,7 @@ from planner.routing import (
     fetch_truck_routes,
     geocode_place,
     gross_weight_kg,
+    suggest_places,
 )
 
 DALLAS = Place("Dallas, TX", 32.7767, -96.7970)
@@ -276,3 +277,21 @@ class FetchRouteOptionsTests(SimpleTestCase):
         mock_fetch.side_effect = RoutingError("HERE found no truck route")
         with self.assertRaises(RoutingError):
             fetch_route_options(DALLAS, HOUSTON, DEPARTURE, 0)
+
+
+@override_settings(HERE_API_KEY="test-key")
+class SuggestPlacesTests(SimpleTestCase):
+    @patch("planner.routing.requests.get")
+    def test_uses_full_address_labels_and_drops_duplicates(self, mock_get):
+        mock_get.return_value = fake_response({"items": [
+            {"id": "a", "title": "India, 190010, Srinagar", "resultType": "locality",
+             "address": {"label": "Srinagar, Jammu & Kashmir, India"}},
+            {"id": "b", "title": "India, 246174, Srinagar", "resultType": "locality",
+             "address": {"label": "Srinagar, Uttarakhand, India"}},
+            {"id": "c", "title": "Srinagar", "resultType": "locality",
+             "address": {"label": "Srinagar, Jammu & Kashmir, India"}},
+            {"id": "d", "title": "Some Street", "resultType": "street"},
+        ]})
+        labels = [s["label"] for s in suggest_places("Srin")]
+        self.assertEqual(labels, ["Srinagar, Jammu & Kashmir, India", "Srinagar, Uttarakhand, India", "Some Street"])
+        self.assertEqual(mock_get.call_args.args[0], "https://autocomplete.search.hereapi.com/v1/autocomplete")
