@@ -1,6 +1,7 @@
 import mapboxgl from 'mapbox-gl'
 import 'mapbox-gl/dist/mapbox-gl.css'
-import { useEffect, useRef, useState } from 'react'
+import { animate } from 'motion'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   averageLatitude,
   boundsOfRoutes,
@@ -14,12 +15,29 @@ import {
   routeLinesGeoJson,
 } from '../mapData'
 import { RISK_COLORS } from '../risk'
-import HeatmapControls from './HeatmapControls'
+import { cumulativeDistances, pointAlongPath, truckProgress } from '../timeline'
+import TripTimeline from './TripTimeline'
 
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN
 const CONTINENTAL_US = { center: [-98.5, 39.5], zoom: 3.4 }
 const EMPTY_COLLECTION = { type: 'FeatureCollection', features: [] }
 const SLATE = '#7C8B96'
+
+const TRUCK_GLIDE_SECONDS = 0.35
+
+function prefersReducedMotion() {
+  return window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false
+}
+
+function createTruckElement() {
+  const element = document.createElement('div')
+  element.className = 'truck-marker'
+  element.setAttribute('aria-hidden', 'true')
+  element.innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" ' +
+    'stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 7h11v9H2z"/>' +
+    '<path d="M13 10h4l3 3v3h-7z"/><circle cx="6" cy="17.5" r="1.5"/><circle cx="16.5" cy="17.5" r="1.5"/></svg>'
+  return element
+}
 
 function withAlpha(hex, alpha) {
   const value = parseInt(hex.slice(1), 16)
@@ -98,6 +116,9 @@ export default function RouteMap({ plan, selectedRouteId, onSelectRoute }) {
   const containerRef = useRef(null)
   const mapRef = useRef(null)
   const popupRef = useRef(null)
+  const truckMarkerRef = useRef(null)
+  // Where the truck marker currently sits, as a share (0-1) of the selected route.
+  const truckShareRef = useRef({ routeId: null, share: 0 })
   const [isMapReady, setIsMapReady] = useState(false)
   const [heatmapLayer, setHeatmapLayer] = useState('risk')
   const [forecastHour, setForecastHour] = useState(0)
@@ -124,6 +145,7 @@ export default function RouteMap({ plan, selectedRouteId, onSelectRoute }) {
     })
     map.addControl(new mapboxgl.NavigationControl({ showCompass: false }), 'top-right')
     popupRef.current = new mapboxgl.Popup({ closeButton: true, maxWidth: '260px' })
+    truckMarkerRef.current = new mapboxgl.Marker({ element: createTruckElement() })
 
     map.on('load', () => {
       addCorridorHeatmap(map)
@@ -168,13 +190,9 @@ export default function RouteMap({ plan, selectedRouteId, onSelectRoute }) {
     map.getSource('corridor').setData(corridorGeoJson(corridor))
     map.setPaintProperty('corridor-heat', 'heatmap-radius',
       heatmapRadiusExpression(corridor.spacing_m, averageLatitude(corridor.points)))
-    // Extra bottom padding keeps routes clear of the heatmap controls card,
-    // scaled down on short (phone) maps so the routes still get most of the space.
-    const mapHeight = map.getContainer().clientHeight
-    map.fitBounds(boundsOfRoutes(plan.routes), {
-      padding: { top: 40, right: 40, left: 40, bottom: Math.min(220, Math.round(mapHeight * 0.4)) },
-      duration: 600,
-    })
+    // The timeline docks under the map once a plan arrives, shrinking it.
+    map.resize()
+    map.fitBounds(boundsOfRoutes(plan.routes), { padding: 48, duration: 600 })
   }, [isMapReady, plan])
 
   // Selection: recolor the chosen route by risk and show its checkpoints.
@@ -199,6 +217,47 @@ export default function RouteMap({ plan, selectedRouteId, onSelectRoute }) {
     if (!isOff) map.setPaintProperty('corridor-heat', 'heatmap-weight', heatmapWeightExpression(heatmapLayer, forecastHour))
   }, [isMapReady, heatmapLayer, forecastHour])
 
+  const selectedRoute = plan?.routes.find((route) => route.id === selectedRouteId)
+  // Path distances are needed on every slider step; measure each route once.
+  const selectedPathDistances = useMemo(
+    () => (selectedRoute ? cumulativeDistances(selectedRoute.path) : null),
+    [selectedRoute],
+  )
+
+  // Truck marker: where the selected route's truck is at the timeline hour.
+  // Motion glides it along the road between hours; a route switch jumps.
+  useEffect(() => {
+    const map = mapRef.current
+    const marker = truckMarkerRef.current
+    if (!isMapReady || !selectedRoute) return undefined
+    const lastCheckpoint = selectedRoute.checkpoints[selectedRoute.checkpoints.length - 1]
+    const moment = Date.parse(plan.corridor_forecast.hours[forecastHour])
+    const { miles } = truckProgress(selectedRoute, moment)
+    const targetShare = lastCheckpoint.distance_miles ? miles / lastCheckpoint.distance_miles : 0
+
+    const placeAt = (share) => {
+      truckShareRef.current = { routeId: selectedRoute.id, share }
+      const [lat, lng] = pointAlongPath(selectedRoute.path, selectedPathDistances, share)
+      marker.setLngLat([lng, lat])
+    }
+    if (!marker.getElement().isConnected) {
+      placeAt(targetShare)
+      marker.addTo(map)
+      return undefined
+    }
+    const current = truckShareRef.current
+    if (current.routeId !== selectedRoute.id || prefersReducedMotion()) {
+      placeAt(targetShare)
+      return undefined
+    }
+    const glide = animate(current.share, targetShare, {
+      duration: TRUCK_GLIDE_SECONDS,
+      ease: 'easeOut',
+      onUpdate: placeAt,
+    })
+    return () => glide.stop()
+  }, [isMapReady, plan, selectedRoute, selectedPathDistances, forecastHour])
+
   if (!MAPBOX_TOKEN) {
     return (
       <p className="map-message">
@@ -206,19 +265,21 @@ export default function RouteMap({ plan, selectedRouteId, onSelectRoute }) {
       </p>
     )
   }
-  const forecastHours = plan?.corridor_forecast.hours ?? []
+  const hasTimeline = (plan?.corridor_forecast.hours.length ?? 0) > 0
   return (
-    <>
+    <div className="map-stack">
       <div ref={containerRef} className="route-map" />
-      {forecastHours.length > 0 && (
-        <HeatmapControls
-          hours={forecastHours}
+      {hasTimeline && (
+        <TripTimeline
+          plan={plan}
+          selectedRouteId={selectedRouteId}
+          onSelectRoute={onSelectRoute}
           hour={forecastHour}
           onHourChange={setForecastHour}
           layer={heatmapLayer}
           onLayerChange={setHeatmapLayer}
         />
       )}
-    </>
+    </div>
   )
 }

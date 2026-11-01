@@ -65,10 +65,18 @@ p {
   background: #DCE3E6;
 }
 
-/* Sized with height, not position: Mapbox's own CSS sets position: relative on this element. */
-.route-map {
-  width: 100%;
+/* Map above, trip timeline below; the map takes whatever height is left. */
+.map-stack {
+  display: flex;
+  flex-direction: column;
   height: 100%;
+}
+
+/* Sized by flex, not position: Mapbox's own CSS sets position: relative on this element. */
+.route-map {
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
 }
 
 .map-message {
@@ -415,12 +423,16 @@ p {
 @media (max-width: 760px) {
   .app {
     grid-template-columns: 1fr;
-    grid-template-rows: 55dvh auto;
+    grid-template-rows: auto auto;
     height: auto;
   }
 
   .map-area {
     order: -1;
+  }
+
+  .route-map {
+    flex: 0 0 50dvh;
   }
 
   .panel {
@@ -437,33 +449,58 @@ p {
   }
 }
 
-/* Heatmap controls: floating card over the bottom-left of the map. */
+/* Trip timeline: docked under the map, one shared clock for routes, heatmap and truck. */
 
-.heatmap-controls {
-  position: absolute;
-  left: var(--space-4);
-  bottom: var(--space-5);
-  z-index: 1;
+.trip-timeline {
   display: grid;
-  gap: var(--space-2);
-  width: min(360px, calc(100% - 2 * var(--space-4)));
-  padding: var(--space-3) var(--space-4);
-  border: 1px solid var(--rule);
-  border-radius: 6px;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4) var(--space-4);
+  border-top: 1px solid var(--rule);
   background: var(--surface);
-  box-shadow: 0 2px 8px rgba(30, 42, 51, 0.15);
+  font-variant-numeric: tabular-nums;
+}
+
+.timeline-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+}
+
+.play-button {
+  flex: 0 0 40px;
+  height: 40px;
+  border: 1px solid var(--rule);
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--interstate-blue);
+  font-size: 0.8125rem;
+  cursor: pointer;
+}
+
+.timeline-time {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 var(--space-3);
+  font-size: 0.9375rem;
+}
+
+.timeline-time span {
+  color: var(--ink-muted);
 }
 
 .heatmap-layers {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(5, auto);
+  margin-left: auto;
   border: 1px solid var(--rule);
   border-radius: 6px;
   overflow: hidden;
 }
 
 .heatmap-layers button {
-  min-height: 32px;
+  min-height: 34px;
+  padding: 0 var(--space-3);
   border: 0;
   background: var(--surface);
   color: var(--ink);
@@ -482,41 +519,114 @@ p {
   color: #FFFFFF;
 }
 
-.heatmap-time {
+/* Labels in the first column, time tracks in the second; rows flatten into the grid. */
+.timeline-grid {
   display: grid;
-  grid-template-columns: 36px 1fr;
+  grid-template-columns: 150px minmax(0, 1fr);
   align-items: center;
-  gap: var(--space-2);
+  gap: 6px var(--space-3);
 }
 
-.play-button {
-  width: 36px;
-  height: 36px;
-  border: 1px solid var(--rule);
-  border-radius: 50%;
-  background: var(--surface);
-  color: var(--interstate-blue);
-  font-size: 0.8125rem;
+.timeline-row {
+  display: contents;
+}
+
+.timeline-axis {
+  position: relative;
+  height: 16px;
+  color: var(--ink-muted);
+  font-size: 0.75rem;
+}
+
+.timeline-axis span {
+  position: absolute;
+  transform: translateX(-50%);
+  white-space: nowrap;
+}
+
+.timeline-axis span:first-child {
+  transform: none;
+}
+
+.timeline-axis span:last-child {
+  transform: translateX(-100%);
+}
+
+.timeline-label {
+  min-height: 32px;
+  padding: 0 var(--space-2);
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   cursor: pointer;
 }
 
-.heatmap-time input[type='range'] {
+.timeline-label:hover {
+  background: var(--panel);
+}
+
+.timeline-label.is-selected {
+  color: var(--interstate-blue);
+  font-weight: 800;
+}
+
+.timeline-track {
+  position: relative;
+  height: 14px;
+  border-radius: 3px;
+  background: var(--panel);
+}
+
+.timeline-track.is-selected {
+  outline: 2px solid var(--interstate-blue);
+  outline-offset: 2px;
+}
+
+.timeline-band {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+}
+
+.timeline-band.is-unknown {
+  background-image: repeating-linear-gradient(135deg, transparent 0 3px, rgba(255, 255, 255, 0.6) 3px 6px);
+}
+
+.timeline-cursor {
+  position: absolute;
+  top: -5px;
+  bottom: -5px;
+  width: 2px;
+  margin-left: -1px;
+  background: var(--ink);
+  pointer-events: none;
+}
+
+.timeline-slider {
   width: 100%;
+  margin: 0;
   accent-color: var(--interstate-blue);
-}
-
-.heatmap-time-label {
-  font-size: 0.875rem;
-  font-variant-numeric: tabular-nums;
-}
-
-.heatmap-time-label span {
-  color: var(--ink-muted);
 }
 
 .heatmap-scale {
   display: grid;
-  gap: 2px;
+  grid-template-columns: auto minmax(120px, 280px);
+  align-items: center;
+  gap: 2px var(--space-3);
+  font-size: 0.75rem;
+  color: var(--ink-muted);
+}
+
+.heatmap-scale-label {
+  grid-row: span 2;
 }
 
 .heatmap-ramp {
@@ -529,28 +639,39 @@ p {
 .heatmap-ticks {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  color: var(--ink-muted);
-  font-size: 0.75rem;
   text-align: right;
 }
 
-button:disabled {
-  cursor: not-allowed;
-  opacity: 0.5;
+/* Truck marker on the map (a Mapbox marker element). */
+.truck-marker {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 3px solid #FFFFFF;
+  border-radius: 50%;
+  background: var(--interstate-blue);
+  color: #FFFFFF;
+  box-shadow: 0 2px 6px rgba(30, 42, 51, 0.35);
 }
 
 @media (max-width: 760px) {
-  /* Sits above the Mapbox logo and attribution, which must stay visible. */
-  .heatmap-controls {
-    left: var(--space-2);
-    bottom: 30px;
-    width: calc(100% - 2 * var(--space-2));
-    gap: 6px;
-    padding: var(--space-2) var(--space-3);
+  .timeline-grid {
+    grid-template-columns: 96px minmax(0, 1fr);
   }
 
-  .heatmap-ticks {
-    font-size: 0.6875rem;
+  /* Visually hidden, still read aloud. */
+  .timeline-label-rest {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .heatmap-layers {
+    margin-left: 0;
   }
 }
 

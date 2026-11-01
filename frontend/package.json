@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "mapbox-gl": "^3.34.1",
+    "motion": "^14.9.0",
     "react": "^19.3.1",
     "react-dom": "^19.3.1"
   },
