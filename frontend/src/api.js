@@ -33,3 +33,17 @@ export async function fetchTripPlan(trip, { signal } = {}) {
   if (body?.detail) throw new TripPlanError(body.detail)
   throw new TripPlanError(`The planner returned an unexpected error (${response.status}).`)
 }
+
+// Suggestions for the From/To fields. Failures return no suggestions rather than
+// an error: typing a full place name still works without them.
+export async function fetchPlaceSuggestions(query, { signal } = {}) {
+  try {
+    const response = await fetch(`/api/places?${new URLSearchParams({ q: query })}`, { signal })
+    if (!response.ok) return []
+    const body = await response.json()
+    return body.suggestions ?? []
+  } catch (error) {
+    if (error.name === 'AbortError') throw error
+    return []
+  }
+}

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { TripPlanError, buildTripPlanQuery, fetchTripPlan } from './api'
+import { TripPlanError, buildTripPlanQuery, fetchPlaceSuggestions, fetchTripPlan } from './api'
 
 const trip = {
   origin: ' Dallas, TX ',
@@ -50,5 +50,19 @@ describe('fetchTripPlan', () => {
   it('explains a network failure', async () => {
     globalThis.fetch = vi.fn().mockRejectedValue(new TypeError('Failed to fetch'))
     await expect(fetchTripPlan(trip)).rejects.toThrow('Could not reach the planner')
+  })
+})
+
+describe('fetchPlaceSuggestions', () => {
+  it('returns the suggestions list', async () => {
+    mockFetch(200, { suggestions: [{ id: 'a', label: 'Denver, CO, United States' }] })
+    await expect(fetchPlaceSuggestions('Denv')).resolves.toEqual([{ id: 'a', label: 'Denver, CO, United States' }])
+    expect(globalThis.fetch.mock.calls[0][0]).toBe('/api/places?q=Denv')
+  })
+  it('treats failures as no suggestions', async () => {
+    mockFetch(502, { detail: 'HERE down' })
+    await expect(fetchPlaceSuggestions('Denv')).resolves.toEqual([])
+    globalThis.fetch = vi.fn().mockRejectedValue(new TypeError('Failed to fetch'))
+    await expect(fetchPlaceSuggestions('Denv')).resolves.toEqual([])
   })
 })
